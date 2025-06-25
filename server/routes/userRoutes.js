@@ -42,7 +42,10 @@ router.post('/login',
 );
 
 router.post('/update-profile',
-  upload.single('idDocument'),
+  upload.fields([
+    { name: 'idDocument', maxCount: 1 },
+    { name: 'profileImage', maxCount: 1 }
+  ]),
   [
     body('phone').optional().isString(),
     body('gender').optional().isString(),

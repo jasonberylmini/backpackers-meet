@@ -49,6 +49,8 @@ const userSchema = new mongoose.Schema({
     default: 0
   },
 
+  profileImage: { type: String }, // file path or URL to profile image
+
   createdAt: {
     type: Date,
     default: Date.now

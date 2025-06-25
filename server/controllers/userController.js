@@ -82,10 +82,14 @@ export const updateProfile = async (req, res) => {
   }
   try {
     const { phone, gender, preferences } = req.body;
-    const idDocument = req.file?.path;
+    const idDocument = req.files?.idDocument?.[0]?.path;
+    const profileImage = req.files?.profileImage?.[0]?.path;
     // Only set verificationStatus to 'pending' if uploading a new doc or not verified
     const user = await User.findById(req.user.userId);
     let updateFields = { phone, gender, preferences };
+    if (profileImage) {
+      updateFields.profileImage = profileImage;
+    }
     if (idDocument) {
       updateFields.idDocument = idDocument;
       updateFields.verificationStatus = 'pending';
