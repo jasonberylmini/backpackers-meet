@@ -4,6 +4,8 @@ import Home from './pages/Home';
 import Register from './pages/Register';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import ProtectedRoute from './components/ProtectedRoute';
 
 export default function App() {
   return (
@@ -14,7 +16,6 @@ export default function App() {
           <Link to="/">Home</Link>
           <Link to="/register">Register</Link>
           <Link to="/login">Login</Link>
-          <Link to="/dashboard">Dashboard</Link>
         </nav>
       </header>
       <Routes>
@@ -22,6 +23,11 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/admin/dashboard" element={
+          <ProtectedRoute requiredRole="admin">
+            <AdminDashboard />
+          </ProtectedRoute>
+        }/>
       </Routes>
     </Router>
   );

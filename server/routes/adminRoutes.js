@@ -6,6 +6,7 @@ import {
 } from '../controllers/adminController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 import isAdmin from '../middlewares/isAdmin.js';
+import { verifyUser } from '../controllers/userController.js';
 
 const router = express.Router();
 
@@ -19,5 +20,6 @@ router.post('/report', verifyToken, isAdmin, generateReport);
 router.get('/reports', verifyToken, isAdmin, getReports);
 router.get('/logs', verifyToken, isAdmin, getAdminLogs);
 
+router.post('/verify/:id', verifyToken, isAdmin, verifyUser);
 
 export default router;

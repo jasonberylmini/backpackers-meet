@@ -27,7 +27,13 @@ export default function Login() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setSuccess('Login successful! Redirecting...');
-      setTimeout(() => navigate('/dashboard'), 1000);
+      setTimeout(() => {
+        if (data.user.role === 'admin') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
+      }, 1000);
       return;
     } catch (err) {
       setError(err.message);

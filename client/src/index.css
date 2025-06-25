@@ -1,9 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
 body {
   margin: 0;
   font-family: system-ui, sans-serif;
   background: #f9f9f9;
   color: #222;
 }
+*/
 
 input, button {
   font-family: inherit;
