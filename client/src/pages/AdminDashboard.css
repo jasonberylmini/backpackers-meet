@@ -12,7 +12,7 @@
 }
 .admin-dashboard-content {
   flex: 1;
-  padding: 2.5rem 2rem 2rem 2rem;
+  padding: 4rem 2rem 3rem 2rem;
 }
 
 /* Stat Cards */
@@ -20,7 +20,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 2rem;
-  margin-bottom: 2.5rem;
+  margin-bottom: 3rem;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
   justify-content: flex-start;
 }
 .admin-dashboard-card {
@@ -50,6 +52,26 @@
   color: #888;
   font-size: 1rem;
   font-weight: 500;
+}
+
+/* Stat card skeleton loader */
+.admin-dashboard-card-skeleton {
+  display: inline-block;
+  width: 2.5rem;
+  height: 2.1rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, #e0e7ff 25%, #f3f6fd 50%, #e0e7ff 75%);
+  animation: admin-skeleton-pulse 1.2s infinite linear;
+}
+@keyframes admin-skeleton-pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+.admin-dashboard-card-error {
+  color: #d32f2f;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 /* Tables */
@@ -96,10 +118,106 @@
   background: #e3e8fa;
 }
 
+/* Table row focus for accessibility */
+.admin-dashboard-table tr:focus-within {
+  outline: 2px solid var(--primary);
+  background: #e3e8fa;
+}
+
+/* Table cell font size */
+.admin-dashboard-table th, .admin-dashboard-table td {
+  font-size: 0.93rem;
+}
+
+/* Pagination controls */
+.admin-dashboard-table-pagination {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  margin-top: 0.7rem;
+  font-size: 0.98rem;
+  justify-content: flex-end;
+}
+.admin-dashboard-table-pagination button {
+  background: var(--sidebar-bg);
+  color: var(--primary);
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.3rem 0.9rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.admin-dashboard-table-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.admin-dashboard-table-pagination button:not(:disabled):hover {
+  background: var(--sidebar-active-bg);
+}
+
+/* Sorted column indicator */
+.admin-dashboard-table th {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+.admin-dashboard-table th.sorted-asc::after {
+  content: ' \25B2'; /* up arrow */
+  font-size: 0.8em;
+  color: var(--primary);
+  margin-left: 0.2em;
+}
+.admin-dashboard-table th.sorted-desc::after {
+  content: ' \25BC'; /* down arrow */
+  font-size: 0.8em;
+  color: var(--primary);
+  margin-left: 0.2em;
+}
+
+/* Table skeleton loader */
+.admin-dashboard-table-skeleton-row td {
+  padding: 0.7rem 0.8rem;
+}
+.admin-dashboard-table-skeleton {
+  display: block;
+  width: 100%;
+  height: 1.1rem;
+  border-radius: 0.4rem;
+  background: linear-gradient(90deg, #e0e7ff 25%, #f3f6fd 50%, #e0e7ff 75%);
+  animation: admin-skeleton-pulse 1.2s infinite linear;
+}
+
+/* Table error message */
+.admin-dashboard-table-error {
+  color: #d32f2f;
+  font-size: 1.05rem;
+  font-weight: 500;
+  margin: 1.2rem 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.admin-dashboard-table-error button {
+  background: var(--sidebar-bg);
+  color: var(--primary);
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.3rem 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.admin-dashboard-table-error button:hover {
+  background: var(--sidebar-active-bg);
+}
+
 /* Sidebar */
 .admin-sidebar {
   width: 220px;
-  background: #e0e7ff;
+  background: var(--sidebar-bg);
   box-shadow: 2px 0 12px rgba(80, 80, 160, 0.07);
   min-height: 100vh;
   display: flex;
@@ -121,24 +239,31 @@
   width: 100%;
 }
 .admin-sidebar-link {
-  color: #4e54c8;
+  color: var(--primary);
   text-decoration: none;
   font-size: 1.08rem;
   font-weight: 500;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 1rem 0.5rem 1.2rem;
   border-radius: 0.7rem;
-  transition: background 0.18s, color 0.18s;
+  transition: background 0.18s, color 0.18s, padding 0.18s, border 0.18s;
   display: block;
+  border-left: 4px solid transparent;
 }
 .admin-sidebar-link:hover,
 .admin-sidebar-link.active {
-  background: #cfd8fc;
+  background: var(--sidebar-active-bg);
   color: #222;
+}
+.admin-sidebar-link.active {
+  border-left: 4px solid var(--sidebar-active-border);
+  padding-left: 2rem;
+  font-weight: bold;
+  background: var(--sidebar-active-bg);
 }
 .admin-sidebar-logout {
   margin-top: 2.5rem;
-  background: #ffe082;
-  color: #4e54c8;
+  background: var(--logout-bg);
+  color: var(--primary);
   font-weight: 600;
   border: none;
   border-radius: 0.7rem;
@@ -149,29 +274,86 @@
   transition: background 0.18s, color 0.18s;
 }
 .admin-sidebar-logout:hover {
-  background: #ffd54f;
+  background: var(--logout-hover-bg);
   color: #222;
 }
 
+/* --- Collapsible Sidebar (Mobile Drawer) --- */
+.admin-sidebar-hamburger {
+  display: none;
+  position: fixed;
+  top: 1.2rem;
+  left: 1.2rem;
+  z-index: 1201;
+  background: var(--sidebar-bg);
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  font-size: 2rem;
+  color: var(--primary);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(80, 80, 160, 0.07);
+  transition: background 0.18s;
+}
+.admin-sidebar-hamburger:active,
+.admin-sidebar-hamburger:focus {
+  background: var(--sidebar-active-bg);
+}
+
+.admin-sidebar-close {
+  display: none;
+  position: absolute;
+  top: 1.2rem;
+  right: 1.2rem;
+  z-index: 1202;
+  background: none;
+  border: none;
+  font-size: 2.2rem;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.admin-sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(60, 70, 120, 0.18);
+  z-index: 1200;
+}
+
 @media (max-width: 900px) {
+  .admin-sidebar-hamburger {
+    display: block;
+  }
   .admin-sidebar {
-    width: 100vw;
-    min-height: unset;
-    flex-direction: row;
-    align-items: center;
-    padding: 1.2rem 0.5rem;
-    gap: 1.5rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 260px;
+    min-width: unset;
+    max-width: 80vw;
+    z-index: 1202;
+    transform: translateX(-110%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: 2px 0 16px rgba(80, 80, 160, 0.13);
+    padding-top: 2.5rem;
+    background: var(--sidebar-bg);
   }
-  .admin-sidebar-title {
-    margin-bottom: 0;
-    margin-right: 1.5rem;
+  .admin-sidebar.open {
+    transform: translateX(0);
   }
-  .admin-sidebar-nav {
-    flex-direction: row;
-    gap: 0.5rem;
+  .admin-sidebar-close {
+    display: block;
   }
-  .admin-sidebar-logout {
-    margin-top: 0;
-    margin-left: auto;
+  .admin-sidebar-overlay {
+    display: block;
+  }
+  /* Hide sidebar in row layout (old style) */
+  .admin-dashboard-root > .admin-sidebar:not(.open) {
+    display: none;
   }
 } 

@@ -2,6 +2,7 @@ import User from '../models/User.js';
 import Trip from '../models/Trip.js';
 import SystemReport from '../models/SystemReport.js';
 import AdminLog from '../models/AdminLog.js';
+import Flag from '../models/Flag.js';
 import winston from 'winston';
 
 const logger = winston.createLogger({
@@ -80,7 +81,25 @@ export const generateReport = async (req, res) => {
 export const getReports = async (req, res) => {
   try {
     const reports = await SystemReport.find().sort({ createdAt: -1 });
-    res.status(200).json(reports);
+    // Enhance each report with summary and user if reportType is 'flag'
+    const reportsWithDetails = await Promise.all(reports.map(async (report) => {
+      let summary = '-';
+      let user = '-';
+      if (report.reportType === 'flag' && report.generatedFor) {
+        const flag = await Flag.findById(report.generatedFor).populate('flaggedBy', 'name email');
+        if (flag) {
+          summary = flag.reason || '-';
+          user = flag.flaggedBy ? flag.flaggedBy.name : '-';
+        }
+      }
+      // Add more reportType logic as needed
+      return {
+        ...report.toObject(),
+        summary,
+        user,
+      };
+    }));
+    res.status(200).json(reportsWithDetails);
   } catch (err) {
     logger.error("Fetch Reports Error:", err);
     res.status(500).json({ message: "Server error" });
