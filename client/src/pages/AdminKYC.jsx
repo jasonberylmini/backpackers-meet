@@ -15,8 +15,8 @@ export default function AdminKYC() {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      const res = await axios.get('/api/admin/users', { headers });
-      setUsers(res.data.filter(u => u.verificationStatus === 'pending'));
+      const res = await axios.get('/api/users/admin/unverified', { headers });
+      setUsers(res.data);
       setLoading(false);
     } catch (err) {
       setError('Failed to load users.');
@@ -32,7 +32,7 @@ export default function AdminKYC() {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.patch(`/api/admin/users/${userId}/verify`, { verificationStatus: 'verified' }, { headers });
+      await axios.put(`/api/user/admin/verify/${userId}`, { status: 'verified' }, { headers });
       fetchPendingKYC();
     } catch (err) {
       alert('Failed to verify user.');
@@ -43,7 +43,7 @@ export default function AdminKYC() {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.patch(`/api/admin/users/${userId}/verify`, { verificationStatus: 'rejected' }, { headers });
+      await axios.put(`/api/user/admin/verify/${userId}`, { status: 'rejected' }, { headers });
       fetchPendingKYC();
     } catch (err) {
       alert('Failed to reject user.');
@@ -102,7 +102,7 @@ export default function AdminKYC() {
                       <td>{u.name}</td>
                       <td>{u.email}</td>
                       <td>{u.gender || '-'}</td>
-                      <td>{u.preferences ? u.preferences.join(', ') : '-'}</td>
+                      <td>{u.preferences ? (Array.isArray(u.preferences) ? u.preferences.join(', ') : u.preferences) : '-'}</td>
                       <td>
                         {u.idDocument ? (
                           <a href={u.idDocument} target="_blank" rel="noopener noreferrer">

@@ -54,7 +54,7 @@ export default function AdminDashboard() {
       const [usersRes, tripsRes, reportsRes, logsRes] = await Promise.all([
         axios.get('/api/admin/users', { headers }),
         axios.get('/api/admin/trips', { headers }),
-        axios.get('/api/admin/reports', { headers }),
+        axios.get('/api/admin/reports?type=flag', { headers }),
         axios.get('/api/admin/logs', { headers })
       ]);
       setStats({

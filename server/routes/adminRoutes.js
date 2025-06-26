@@ -2,7 +2,7 @@ import express from 'express';
 import {
   getAllUsers,
   toggleBanUser,
-  getAllTrips, generateReport, getReports, getAdminLogs
+  getAllTrips, getReports, getAdminLogs, deleteTrip
 } from '../controllers/adminController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 import isAdmin from '../middlewares/isAdmin.js';
@@ -16,10 +16,11 @@ router.put('/ban/:id', verifyToken, isAdmin, toggleBanUser);
 router.get('/trips', verifyToken, isAdmin, getAllTrips);
 
 // 🔒 Protected for admin
-router.post('/report', verifyToken, isAdmin, generateReport);
 router.get('/reports', verifyToken, isAdmin, getReports);
 router.get('/logs', verifyToken, isAdmin, getAdminLogs);
 
 router.post('/verify/:id', verifyToken, isAdmin, verifyUser);
+
+router.delete('/trips/:id', verifyToken, isAdmin, deleteTrip);
 
 export default router;

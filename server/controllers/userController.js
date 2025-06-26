@@ -113,7 +113,7 @@ export const updateProfile = async (req, res) => {
 
 export const getUnverifiedUsers = async (req, res) => {
   try {
-    const users = await User.find({ verificationStatus: "pending" }).select('name email verificationStatus createdAt');
+    const users = await User.find({ verificationStatus: "pending" }).select('name email gender preferences idDocument verificationStatus createdAt');
     res.status(200).json(users);
   } catch (err) {
     logger.error("Fetch error:", err);
