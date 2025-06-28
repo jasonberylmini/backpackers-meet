@@ -32,6 +32,9 @@ if (!fs.existsSync(uploadsDir)) {
 
 const app = express();
 
+// Serve uploads directory statically
+app.use('/uploads', express.static(path.resolve('uploads')));
+
 // CORS configuration
 app.use(cors({
   origin: '*', // TODO: restrict in production

@@ -103,7 +103,7 @@ export default function AdminReports() {
     <div className="admin-dashboard-root">
       <Sidebar />
       <div className="admin-dashboard-main">
-        <Topbar title="System Reports" />
+        <Topbar />
         <main className="admin-dashboard-content">
           <h2 style={{ marginBottom: '1.5rem', color: '#4e54c8', fontWeight: 800, fontSize: '2.1rem', letterSpacing: 0.5 }}>System Reports</h2>
           <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center' }}>
@@ -129,70 +129,76 @@ export default function AdminReports() {
             ) : !summary ? (
               <div style={{ color: '#888', fontSize: '1.1rem', padding: '2rem 0' }}>No data found.</div>
             ) : (
-              <div style={cardStyle}>
-                {/* Icon/Type Column */}
-                <div style={iconColStyle}>
-                  <span style={{ fontSize: '2.7rem', marginBottom: 8 }}>{typeStyles[summary.reportType]?.icon}</span>
-                  <span style={{ color: typeStyles[summary.reportType]?.color, fontWeight: 700, fontSize: '1.13rem', textAlign: 'center' }}>
-                    {REPORT_TABS.find(t => t.key === summary.reportType)?.label}
-                  </span>
+              <div className="admin-dashboard-content-card">
+                <div className="admin-users-header-row">
+                  <div className="admin-logged-in-as">Logged in as Admin: <span>{JSON.parse(localStorage.getItem('user'))?.name}</span></div>
+                  <h1 className="admin-section-title">Reports</h1>
                 </div>
-                {/* Summary Column */}
-                <div style={summaryColStyle}>
-                  {summary.reportType === 'flag' && (
-                    <>
-                      <div style={sectionTitle}>Total Flags: <span style={{ color: '#222', fontWeight: 600 }}>{summary.totalFlags ?? '-'}</span></div>
-                      <div style={{ marginBottom: 12 }}><span style={sectionTitle}>By Type:</span> <span style={labelStyle}>User:</span> {summary.byType?.user ?? '-'}, <span style={labelStyle}>Review:</span> {summary.byType?.review ?? '-'}</div>
-                      <div style={sectionTitle}>Top 3 Flagged Users:</div>
-                      <ol style={listStyle}>
-                        {Array.isArray(summary.topFlaggedUsers) && summary.topFlaggedUsers.length > 0 ? summary.topFlaggedUsers.map((u) => (
-                          <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span> <b>- {u.count} flags</b></li>
-                        )) : <li style={labelStyle}>None</li>}
-                      </ol>
-                      <div style={sectionTitle}>Top 3 Flagged Reviews:</div>
-                      <ol style={listStyle}>
-                        {Array.isArray(summary.topFlaggedReviews) && summary.topFlaggedReviews.length > 0 ? summary.topFlaggedReviews.map((r) => (
-                          <li key={r._id}><span style={{ fontStyle: 'italic' }}>{r.comment ? `"${r.comment}"` : 'No comment'}</span> (Rating: {r.rating}) <b>- {r.count} flags</b>{r.reviewer && (<span style={labelStyle}> by {r.reviewer.name} ({r.reviewer.email})</span>)}</li>
-                        )) : <li style={labelStyle}>None</li>}
-                      </ol>
-                    </>
-                  )}
-                  {summary.reportType === 'trip' && (
-                    <>
-                      <div style={sectionTitle}>Total Trips: <span style={{ color: '#222', fontWeight: 600 }}>{summary.totalTrips ?? '-'}</span></div>
-                      <div style={{ marginBottom: 12 }}><span style={sectionTitle}>By Type:</span> {summary.byType ? Object.entries(summary.byType).map(([type, count]) => <span key={type}><span style={labelStyle}>{type}:</span> {count} &nbsp;</span>) : '-'}</div>
-                      <div style={sectionTitle}>Top 3 Destinations:</div>
-                      <ol style={listStyle}>
-                        {Array.isArray(summary.topDestinations) && summary.topDestinations.length > 0 ? summary.topDestinations.map((d) => (
-                          <li key={d.destination}>{d.destination} <b>- {d.count} trips</b></li>
-                        )) : <li style={labelStyle}>None</li>}
-                      </ol>
-                    </>
-                  )}
-                  {summary.reportType === 'user' && (
-                    <>
-                      <div style={sectionTitle}>Total Users: <span style={{ color: '#222', fontWeight: 600 }}>{summary.totalUsers ?? '-'}</span></div>
-                      <div style={sectionTitle}>New Users (Last 30 Days): <span style={{ color: '#222', fontWeight: 600 }}>{summary.newUsersLast30Days ?? '-'}</span></div>
-                      <div style={sectionTitle}>Recent Signups:</div>
-                      <ol style={listStyle}>
-                        {Array.isArray(summary.recentSignups) && summary.recentSignups.length > 0 ? summary.recentSignups.map((u) => (
-                          <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span></li>
-                        )) : <li style={labelStyle}>None</li>}
-                      </ol>
-                      <div style={sectionTitle}>Most Active Users:</div>
-                      <ol style={listStyle}>
-                        {Array.isArray(summary.mostActive) && summary.mostActive.length > 0 ? summary.mostActive.map((u) => (
-                          <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span> <b>- {u.tripCount} trips</b></li>
-                        )) : <li style={labelStyle}>None</li>}
-                      </ol>
-                      <div style={sectionTitle}>Top 3 Creators:</div>
-                      <ol style={listStyle}>
-                        {Array.isArray(summary.topCreators) && summary.topCreators.length > 0 ? summary.topCreators.map((u) => (
-                          <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span> <b>- {u.count} trips</b></li>
-                        )) : <li style={labelStyle}>None</li>}
-                      </ol>
-                    </>
-                  )}
+                <div style={cardStyle}>
+                  {/* Icon/Type Column */}
+                  <div style={iconColStyle}>
+                    <span style={{ fontSize: '2.7rem', marginBottom: 8 }}>{typeStyles[summary.reportType]?.icon}</span>
+                    <span style={{ color: typeStyles[summary.reportType]?.color, fontWeight: 700, fontSize: '1.13rem', textAlign: 'center' }}>
+                      {REPORT_TABS.find(t => t.key === summary.reportType)?.label}
+                    </span>
+                  </div>
+                  {/* Summary Column */}
+                  <div style={summaryColStyle}>
+                    {summary.reportType === 'flag' && (
+                      <>
+                        <div style={sectionTitle}>Total Flags: <span style={{ color: '#222', fontWeight: 600 }}>{summary.totalFlags ?? '-'}</span></div>
+                        <div style={{ marginBottom: 12 }}><span style={sectionTitle}>By Type:</span> <span style={labelStyle}>User:</span> {summary.byType?.user ?? '-'}, <span style={labelStyle}>Review:</span> {summary.byType?.review ?? '-'}</div>
+                        <div style={sectionTitle}>Top 3 Flagged Users:</div>
+                        <ol style={listStyle}>
+                          {Array.isArray(summary.topFlaggedUsers) && summary.topFlaggedUsers.length > 0 ? summary.topFlaggedUsers.map((u) => (
+                            <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span> <b>- {u.count} flags</b></li>
+                          )) : <li style={labelStyle}>None</li>}
+                        </ol>
+                        <div style={sectionTitle}>Top 3 Flagged Reviews:</div>
+                        <ol style={listStyle}>
+                          {Array.isArray(summary.topFlaggedReviews) && summary.topFlaggedReviews.length > 0 ? summary.topFlaggedReviews.map((r) => (
+                            <li key={r._id}><span style={{ fontStyle: 'italic' }}>{r.comment ? `"${r.comment}"` : 'No comment'}</span> (Rating: {r.rating}) <b>- {r.count} flags</b>{r.reviewer && (<span style={labelStyle}> by {r.reviewer.name} ({r.reviewer.email})</span>)}</li>
+                          )) : <li style={labelStyle}>None</li>}
+                        </ol>
+                      </>
+                    )}
+                    {summary.reportType === 'trip' && (
+                      <>
+                        <div style={sectionTitle}>Total Trips: <span style={{ color: '#222', fontWeight: 600 }}>{summary.totalTrips ?? '-'}</span></div>
+                        <div style={{ marginBottom: 12 }}><span style={sectionTitle}>By Type:</span> {summary.byType ? Object.entries(summary.byType).map(([type, count]) => <span key={type}><span style={labelStyle}>{type}:</span> {count} &nbsp;</span>) : '-'}</div>
+                        <div style={sectionTitle}>Top 3 Destinations:</div>
+                        <ol style={listStyle}>
+                          {Array.isArray(summary.topDestinations) && summary.topDestinations.length > 0 ? summary.topDestinations.map((d) => (
+                            <li key={d.destination}>{d.destination} <b>- {d.count} trips</b></li>
+                          )) : <li style={labelStyle}>None</li>}
+                        </ol>
+                      </>
+                    )}
+                    {summary.reportType === 'user' && (
+                      <>
+                        <div style={sectionTitle}>Total Users: <span style={{ color: '#222', fontWeight: 600 }}>{summary.totalUsers ?? '-'}</span></div>
+                        <div style={sectionTitle}>New Users (Last 30 Days): <span style={{ color: '#222', fontWeight: 600 }}>{summary.newUsersLast30Days ?? '-'}</span></div>
+                        <div style={sectionTitle}>Recent Signups:</div>
+                        <ol style={listStyle}>
+                          {Array.isArray(summary.recentSignups) && summary.recentSignups.length > 0 ? summary.recentSignups.map((u) => (
+                            <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span></li>
+                          )) : <li style={labelStyle}>None</li>}
+                        </ol>
+                        <div style={sectionTitle}>Most Active Users:</div>
+                        <ol style={listStyle}>
+                          {Array.isArray(summary.mostActive) && summary.mostActive.length > 0 ? summary.mostActive.map((u) => (
+                            <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span> <b>- {u.tripCount} trips</b></li>
+                          )) : <li style={labelStyle}>None</li>}
+                        </ol>
+                        <div style={sectionTitle}>Top 3 Creators:</div>
+                        <ol style={listStyle}>
+                          {Array.isArray(summary.topCreators) && summary.topCreators.length > 0 ? summary.topCreators.map((u) => (
+                            <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span> <b>- {u.count} trips</b></li>
+                          )) : <li style={labelStyle}>None</li>}
+                        </ol>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

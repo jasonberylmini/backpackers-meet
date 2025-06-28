@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [success, setSuccess] = useState('');
   const navigate = useNavigate();
 
   const handleChange = e => {
@@ -14,8 +13,6 @@ export default function Login() {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
     try {
       const res = await fetch('/api/users/login', {
         method: 'POST',
@@ -24,9 +21,12 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Login failed');
+      
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      setSuccess('Login successful! Redirecting...');
+      
+      toast.success('Login successful! Redirecting...');
+      
       setTimeout(() => {
         if (data.user.role === 'admin') {
           navigate('/admin/dashboard');
@@ -36,7 +36,7 @@ export default function Login() {
       }, 1000);
       return;
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -84,8 +84,6 @@ export default function Login() {
           </div>
           <button className="auth-btn" type="submit">Login</button>
         </form>
-        {error && <p className="auth-error">{error}</p>}
-        {success && <p className="auth-success">{success}</p>}
       </div>
     </div>
   );

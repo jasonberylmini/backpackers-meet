@@ -107,140 +107,146 @@ export default function AdminDashboard() {
     <div className="admin-dashboard-root">
       <Sidebar />
       <div className="admin-dashboard-main">
-        <Topbar title="Admin Dashboard" admin={admin} />
+        <Topbar admin={admin} />
         <main className="admin-dashboard-content">
-          <div className="admin-dashboard-cards">
-            <DashboardCard title="Total Users" value={stats.users} icon="👤" loading={loading} error={error} />
-            <DashboardCard title="Pending KYC" value={stats.pendingKYC} icon="🕒" loading={loading} error={error} />
-            <DashboardCard title="Total Trips" value={stats.trips} icon="🧳" loading={loading} error={error} />
-            <DashboardCard title="Reports" value={stats.reports} icon="📄" loading={loading} error={error} />
-            <DashboardCard title="Admin Logs" value={stats.logs} icon="📝" loading={loading} error={error} />
-          </div>
-          <div className="admin-dashboard-tables">
-            <section className="admin-dashboard-table-section">
-              <h3 className="admin-dashboard-table-title">Recent User Signups</h3>
-              <div className="admin-dashboard-table-wrapper">
-                {loading ? (
-                  <table className="admin-dashboard-table">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Joined</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...Array(5)].map((_, i) => (
-                        <tr key={i} className="admin-dashboard-table-skeleton-row">
-                          <td colSpan={5}><span className="admin-dashboard-table-skeleton" /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : error ? (
-                  <div className="admin-dashboard-table-error">
-                    {error} <button onClick={fetchData}>Retry</button>
-                  </div>
-                ) : (
-                  <>
+          <div className="admin-dashboard-content-card">
+            <div className="admin-users-header-row">
+              <div className="admin-logged-in-as">Logged in as Admin: <span>{admin?.name}</span></div>
+              <h1 className="admin-section-title">Dashboard</h1>
+            </div>
+            <div className="admin-dashboard-cards">
+              <DashboardCard title="Total Users" value={stats.users} icon="👤" loading={loading} error={error} />
+              <DashboardCard title="Pending KYC" value={stats.pendingKYC} icon="🕒" loading={loading} error={error} />
+              <DashboardCard title="Total Trips" value={stats.trips} icon="🧳" loading={loading} error={error} />
+              <DashboardCard title="Reports" value={stats.reports} icon="📄" loading={loading} error={error} />
+              <DashboardCard title="Admin Logs" value={stats.logs} icon="📝" loading={loading} error={error} />
+            </div>
+            <div className="admin-dashboard-tables">
+              <section className="admin-dashboard-table-section">
+                <h3 className="admin-dashboard-table-title">Recent User Signups</h3>
+                <div className="admin-dashboard-table-wrapper">
+                  {loading ? (
                     <table className="admin-dashboard-table">
                       <thead>
                         <tr>
-                          <th onClick={() => handleUserSort('name')} tabIndex={0} className={userSort.key === 'name' ? `sorted-${userSort.direction}` : ''}>Name</th>
-                          <th onClick={() => handleUserSort('email')} tabIndex={0} className={userSort.key === 'email' ? `sorted-${userSort.direction}` : ''}>Email</th>
-                          <th onClick={() => handleUserSort('role')} tabIndex={0} className={userSort.key === 'role' ? `sorted-${userSort.direction}` : ''}>Role</th>
-                          <th onClick={() => handleUserSort('verificationStatus')} tabIndex={0} className={userSort.key === 'verificationStatus' ? `sorted-${userSort.direction}` : ''}>Status</th>
-                          <th onClick={() => handleUserSort('createdAt')} tabIndex={0} className={userSort.key === 'createdAt' ? `sorted-${userSort.direction}` : ''}>Joined</th>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Role</th>
+                          <th>Status</th>
+                          <th>Joined</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pagedUsers.map(u => (
-                          <tr key={u._id} tabIndex={0}>
-                            <td>{u.name}</td>
-                            <td>{u.email}</td>
-                            <td>{u.role}</td>
-                            <td>{u.verificationStatus}</td>
-                            <td>{new Date(u.createdAt).toLocaleDateString()}</td>
+                        {[...Array(5)].map((_, i) => (
+                          <tr key={i} className="admin-dashboard-table-skeleton-row">
+                            <td colSpan={5}><span className="admin-dashboard-table-skeleton" /></td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {/* Pagination controls */}
-                    {userPageCount > 1 && (
-                      <div className="admin-dashboard-table-pagination">
-                        <button onClick={() => setUserPage(p => Math.max(1, p - 1))} disabled={userPage === 1}>Prev</button>
-                        <span>Page {userPage} of {userPageCount}</span>
-                        <button onClick={() => setUserPage(p => Math.min(userPageCount, p + 1))} disabled={userPage === userPageCount}>Next</button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </section>
-            <section className="admin-dashboard-table-section">
-              <h3 className="admin-dashboard-table-title">Recent Admin Logs</h3>
-              <div className="admin-dashboard-table-wrapper">
-                {loading ? (
-                  <table className="admin-dashboard-table">
-                    <thead>
-                      <tr>
-                        <th>Admin</th>
-                        <th>Action</th>
-                        <th>User</th>
-                        <th>Reason</th>
-                        <th>Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...Array(5)].map((_, i) => (
-                        <tr key={i} className="admin-dashboard-table-skeleton-row">
-                          <td colSpan={5}><span className="admin-dashboard-table-skeleton" /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : error ? (
-                  <div className="admin-dashboard-table-error">
-                    {error} <button onClick={fetchData}>Retry</button>
-                  </div>
-                ) : (
-                  <>
+                  ) : error ? (
+                    <div className="admin-dashboard-table-error">
+                      {error} <button onClick={fetchData}>Retry</button>
+                    </div>
+                  ) : (
+                    <>
+                      <table className="admin-dashboard-table">
+                        <thead>
+                          <tr>
+                            <th onClick={() => handleUserSort('name')} tabIndex={0} className={userSort.key === 'name' ? `sorted-${userSort.direction}` : ''}>Name</th>
+                            <th onClick={() => handleUserSort('email')} tabIndex={0} className={userSort.key === 'email' ? `sorted-${userSort.direction}` : ''}>Email</th>
+                            <th onClick={() => handleUserSort('role')} tabIndex={0} className={userSort.key === 'role' ? `sorted-${userSort.direction}` : ''}>Role</th>
+                            <th onClick={() => handleUserSort('verificationStatus')} tabIndex={0} className={userSort.key === 'verificationStatus' ? `sorted-${userSort.direction}` : ''}>Status</th>
+                            <th onClick={() => handleUserSort('createdAt')} tabIndex={0} className={userSort.key === 'createdAt' ? `sorted-${userSort.direction}` : ''}>Joined</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pagedUsers.map(u => (
+                            <tr key={u._id} tabIndex={0}>
+                              <td>{u.name}</td>
+                              <td>{u.email}</td>
+                              <td>{u.role}</td>
+                              <td>{u.verificationStatus}</td>
+                              <td>{new Date(u.createdAt).toLocaleDateString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {/* Pagination controls */}
+                      {userPageCount > 1 && (
+                        <div className="admin-dashboard-table-pagination">
+                          <button onClick={() => setUserPage(p => Math.max(1, p - 1))} disabled={userPage === 1}>Prev</button>
+                          <span>Page {userPage} of {userPageCount}</span>
+                          <button onClick={() => setUserPage(p => Math.min(userPageCount, p + 1))} disabled={userPage === userPageCount}>Next</button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </section>
+              <section className="admin-dashboard-table-section">
+                <h3 className="admin-dashboard-table-title">Recent Admin Logs</h3>
+                <div className="admin-dashboard-table-wrapper">
+                  {loading ? (
                     <table className="admin-dashboard-table">
                       <thead>
                         <tr>
-                          <th onClick={() => handleLogSort('adminId.name')} tabIndex={0} className={logSort.key === 'adminId.name' ? `sorted-${logSort.direction}` : ''}>Admin</th>
-                          <th onClick={() => handleLogSort('action')} tabIndex={0} className={logSort.key === 'action' ? `sorted-${logSort.direction}` : ''}>Action</th>
-                          <th onClick={() => handleLogSort('targetUserId.email')} tabIndex={0} className={logSort.key === 'targetUserId.email' ? `sorted-${logSort.direction}` : ''}>User</th>
-                          <th onClick={() => handleLogSort('reason')} tabIndex={0} className={logSort.key === 'reason' ? `sorted-${logSort.direction}` : ''}>Reason</th>
-                          <th onClick={() => handleLogSort('timestamp')} tabIndex={0} className={logSort.key === 'timestamp' ? `sorted-${logSort.direction}` : ''}>Time</th>
+                          <th>Admin</th>
+                          <th>Action</th>
+                          <th>User</th>
+                          <th>Reason</th>
+                          <th>Time</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pagedLogs.map(log => (
-                          <tr key={log._id} tabIndex={0}>
-                            <td>{log.adminId?.name}</td>
-                            <td>{log.action}</td>
-                            <td>{log.targetUserId?.email}</td>
-                            <td>{log.reason}</td>
-                            <td>{new Date(log.timestamp).toLocaleString()}</td>
+                        {[...Array(5)].map((_, i) => (
+                          <tr key={i} className="admin-dashboard-table-skeleton-row">
+                            <td colSpan={5}><span className="admin-dashboard-table-skeleton" /></td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {/* Pagination controls */}
-                    {logPageCount > 1 && (
-                      <div className="admin-dashboard-table-pagination">
-                        <button onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logPage === 1}>Prev</button>
-                        <span>Page {logPage} of {logPageCount}</span>
-                        <button onClick={() => setLogPage(p => Math.min(logPageCount, p + 1))} disabled={logPage === logPageCount}>Next</button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </section>
+                  ) : error ? (
+                    <div className="admin-dashboard-table-error">
+                      {error} <button onClick={fetchData}>Retry</button>
+                    </div>
+                  ) : (
+                    <>
+                      <table className="admin-dashboard-table">
+                        <thead>
+                          <tr>
+                            <th onClick={() => handleLogSort('adminId.name')} tabIndex={0} className={logSort.key === 'adminId.name' ? `sorted-${logSort.direction}` : ''}>Admin</th>
+                            <th onClick={() => handleLogSort('action')} tabIndex={0} className={logSort.key === 'action' ? `sorted-${logSort.direction}` : ''}>Action</th>
+                            <th onClick={() => handleLogSort('targetUserId.email')} tabIndex={0} className={logSort.key === 'targetUserId.email' ? `sorted-${logSort.direction}` : ''}>User</th>
+                            <th onClick={() => handleLogSort('reason')} tabIndex={0} className={logSort.key === 'reason' ? `sorted-${logSort.direction}` : ''}>Reason</th>
+                            <th onClick={() => handleLogSort('timestamp')} tabIndex={0} className={logSort.key === 'timestamp' ? `sorted-${logSort.direction}` : ''}>Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pagedLogs.map(log => (
+                            <tr key={log._id} tabIndex={0}>
+                              <td>{log.adminId?.name}</td>
+                              <td>{log.action}</td>
+                              <td>{log.targetUserId?.email}</td>
+                              <td>{log.reason}</td>
+                              <td>{new Date(log.timestamp).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {/* Pagination controls */}
+                      {logPageCount > 1 && (
+                        <div className="admin-dashboard-table-pagination">
+                          <button onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logPage === 1}>Prev</button>
+                          <span>Page {logPage} of {logPageCount}</span>
+                          <button onClick={() => setLogPage(p => Math.min(logPageCount, p + 1))} disabled={logPage === logPageCount}>Next</button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </section>
+            </div>
           </div>
         </main>
       </div>

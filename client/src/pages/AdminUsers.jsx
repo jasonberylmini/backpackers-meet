@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import Sidebar from '../components/Sidebar';
 import Topbar from '../components/Topbar';
+import toast from 'react-hot-toast';
 import '../pages/AdminDashboard.css';
 
 export default function AdminUsers() {
@@ -39,7 +40,9 @@ export default function AdminUsers() {
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase());
     const matchesRole = roleFilter ? u.role === roleFilter : true;
-    const matchesStatus = statusFilter ? (statusFilter === 'banned' ? u.banned : !u.banned) : true;
+    const matchesStatus = statusFilter
+      ? (statusFilter === 'banned' ? u.isBanned : !u.isBanned)
+      : true;
     return matchesSearch && matchesRole && matchesStatus;
   });
 
@@ -48,14 +51,15 @@ export default function AdminUsers() {
   const paged = filtered.slice((page - 1) * USERS_PER_PAGE, page * USERS_PER_PAGE);
 
   // Ban/Unban
-  const handleBanToggle = async (userId, banned) => {
+  const handleBanToggle = async (userId, isBanned) => {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.patch(`/api/admin/users/${userId}/ban`, { banned: !banned }, { headers });
+      await axios.put(`/api/admin/ban/${userId}`, { isBanned: !isBanned }, { headers });
+      toast.success(!isBanned ? 'User banned!' : 'User unbanned!');
       fetchUsers();
     } catch (err) {
-      alert('Failed to update user status.');
+      toast.error('Failed to update user status.');
     }
   };
 
@@ -63,53 +67,34 @@ export default function AdminUsers() {
     <div className="admin-dashboard-root">
       <Sidebar />
       <div className="admin-dashboard-main">
-        <Topbar title="Manage Users" />
+        <Topbar />
         <main className="admin-dashboard-content">
-          <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <input
-              type="text"
-              placeholder="Search by name or email"
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1); }}
-              style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '1px solid #cfd8fc', minWidth: 200 }}
-            />
-            <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #cfd8fc' }}>
-              <option value="">All Roles</option>
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-            </select>
-            <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #cfd8fc' }}>
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="banned">Banned</option>
-            </select>
-          </div>
-          <div className="admin-dashboard-table-wrapper">
-            {loading ? (
-              <table className="admin-dashboard-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...Array(5)].map((_, i) => (
-                    <tr key={i} className="admin-dashboard-table-skeleton-row">
-                      <td colSpan={5}><span className="admin-dashboard-table-skeleton" /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : error ? (
-              <div className="admin-dashboard-table-error">
-                {error} <button onClick={fetchUsers}>Retry</button>
-              </div>
-            ) : (
-              <>
+          <div className="admin-dashboard-content-card">
+            <div className="admin-users-header-row">
+              <div className="admin-logged-in-as">Logged in as Admin: <span>{JSON.parse(localStorage.getItem('user'))?.name}</span></div>
+              <h1 className="admin-section-title">Users</h1>
+            </div>
+            <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Search by name or email"
+                value={search}
+                onChange={e => { setSearch(e.target.value); setPage(1); }}
+                style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '1px solid #cfd8fc', minWidth: 200 }}
+              />
+              <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #cfd8fc' }}>
+                <option value="">All Roles</option>
+                <option value="traveler">Traveler</option>
+                <option value="admin">Admin</option>
+              </select>
+              <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #cfd8fc' }}>
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="banned">Banned</option>
+              </select>
+            </div>
+            <div className="admin-dashboard-table-wrapper">
+              {loading ? (
                 <table className="admin-dashboard-table">
                   <thead>
                     <tr>
@@ -121,43 +106,68 @@ export default function AdminUsers() {
                     </tr>
                   </thead>
                   <tbody>
-                    {paged.map(u => (
-                      <tr key={u._id}>
-                        <td>{u.name}</td>
-                        <td>{u.email}</td>
-                        <td>{u.role}</td>
-                        <td>{u.banned ? 'Banned' : 'Active'}</td>
-                        <td>
-                          <button
-                            style={{
-                              background: u.banned ? '#4e54c8' : '#d32f2f',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: '0.5rem',
-                              padding: '0.3rem 1rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              transition: 'background 0.18s',
-                            }}
-                            onClick={() => handleBanToggle(u._id, u.banned)}
-                          >
-                            {u.banned ? 'Unban' : 'Ban'}
-                          </button>
-                        </td>
+                    {[...Array(5)].map((_, i) => (
+                      <tr key={i} className="admin-dashboard-table-skeleton-row">
+                        <td colSpan={5}><span className="admin-dashboard-table-skeleton" /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {/* Pagination controls */}
-                {pageCount > 1 && (
-                  <div className="admin-dashboard-table-pagination">
-                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</button>
-                    <span>Page {page} of {pageCount}</span>
-                    <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page === pageCount}>Next</button>
-                  </div>
-                )}
-              </>
-            )}
+              ) : error ? (
+                <div className="admin-dashboard-table-error">
+                  {error} <button onClick={fetchUsers}>Retry</button>
+                </div>
+              ) : (
+                <>
+                  <table className="admin-dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paged.map(u => (
+                        <tr key={u._id}>
+                          <td>{u.name}</td>
+                          <td>{u.email}</td>
+                          <td>{u.role}</td>
+                          <td>{u.isBanned ? 'Banned' : 'Active'}</td>
+                          <td>
+                            <button
+                              style={{
+                                background: u.isBanned ? '#4e54c8' : '#d32f2f',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '0.5rem',
+                                padding: '0.3rem 1rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'background 0.18s',
+                              }}
+                              onClick={() => handleBanToggle(u._id, u.isBanned)}
+                            >
+                              {u.isBanned ? 'Unban' : 'Ban'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {/* Pagination controls */}
+                  {pageCount > 1 && (
+                    <div className="admin-dashboard-table-pagination">
+                      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</button>
+                      <span>Page {page} of {pageCount}</span>
+                      <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page === pageCount}>Next</button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </main>
       </div>
