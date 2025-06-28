@@ -97,7 +97,7 @@ export default function AdminTrips() {
                       <tr key={trip._id}>
                         <td>{trip.destination}</td>
                         <td>{trip.date ? new Date(trip.date).toLocaleDateString() : '-'}</td>
-                        <td>{trip.budget ? `$${trip.budget}` : '-'}</td>
+                        <td>{trip.budget ? `₹${trip.budget}` : '-'}</td>
                         <td>{trip.tripType || '-'}</td>
                         <td>{trip.creator?.name || '-'}</td>
                         <td>{trip.members ? trip.members.length : 0}</td>

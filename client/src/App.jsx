@@ -10,6 +10,7 @@ import AdminUsers from './pages/AdminUsers';
 import AdminKYC from './pages/AdminKYC';
 import AdminTrips from './pages/AdminTrips';
 import AdminReports from './pages/AdminReports';
+import AdminLogs from './pages/AdminLogs';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function AppRoutes() {
@@ -56,6 +57,11 @@ function AppRoutes() {
         <Route path="/admin/reports" element={
           <ProtectedRoute requiredRole="admin">
             <AdminReports />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/logs" element={
+          <ProtectedRoute requiredRole="admin">
+            <AdminLogs />
           </ProtectedRoute>
         } />
       </Routes>

@@ -61,7 +61,7 @@ export default function AdminDashboard() {
         users: usersRes.data.length,
         pendingKYC: usersRes.data.filter(u => u.verificationStatus === 'pending').length,
         trips: tripsRes.data.length,
-        reports: reportsRes.data.length,
+        reports: reportsRes.data.totalFlags,
         logs: logsRes.data.length
       });
       setAllUsers(usersRes.data);
