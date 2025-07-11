@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 export default function Login() {
@@ -21,12 +21,9 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Login failed');
-      
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      
       toast.success('Login successful! Redirecting...');
-      
       setTimeout(() => {
         if (data.user.role === 'admin') {
           navigate('/admin/dashboard');
@@ -41,16 +38,21 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-bg">
-      <div className="auth-card">
-        <h2 className="auth-title">Login</h2>
-        <form onSubmit={handleSubmit} className="auth-form">
-          <div className="auth-field">
-            <label>Email:</label>
-            <input type="email" name="email" value={form.email} onChange={handleChange} required style={{ width: '100%', boxSizing: 'border-box' }} />
+    <div className="signup-bg-dark">
+      <div className="signup-card-dark">
+        <div className="signup-tabs">
+          <span className="signup-tab active">Log In</span>
+          <Link to="/register" className="signup-tab">Sign Up</Link>
+        </div>
+        <h2 className="signup-title">Log In</h2>
+        <p className="signup-desc">Enter your credentials to access your account</p>
+        <form onSubmit={handleSubmit} className="signup-form">
+          <div className="signup-field">
+            <label>Email</label>
+            <input type="email" name="email" value={form.email} onChange={handleChange} required />
           </div>
-          <div className="auth-field">
-            <label>Password:</label>
+          <div className="signup-field">
+            <label>Password</label>
             <span style={{ position: 'relative', display: 'flex', width: '100%', alignItems: 'center' }}>
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -82,7 +84,7 @@ export default function Login() {
               </button>
             </span>
           </div>
-          <button className="auth-btn" type="submit">Login</button>
+          <button className="signup-btn-dark" type="submit">Log in</button>
         </form>
       </div>
     </div>

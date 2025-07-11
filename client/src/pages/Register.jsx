@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
@@ -32,20 +32,21 @@ export default function Register() {
   };
 
   return (
-    <div className="auth-bg">
-      <div className="auth-card">
-        <h2 className="auth-title">Register</h2>
-        <form onSubmit={handleSubmit} className="auth-form">
-          <div className="auth-field">
-            <label>Name:</label>
-            <input type="text" name="name" value={form.name} onChange={handleChange} required style={{ width: '100%', boxSizing: 'border-box' }} />
+    <div className="signup-bg-dark">
+      <div className="signup-card-dark">
+        <div className="signup-tabs">
+          <Link to="/login" className="signup-tab">Log In</Link>
+          <span className="signup-tab active">Sign Up</span>
+        </div>
+        <h2 className="signup-title">Create Account</h2>
+        <p className="signup-desc">Join Backpackr to connect with travelers around the world</p>
+        <form onSubmit={handleSubmit} className="signup-form">
+          <div className="signup-field">
+            <label>Email</label>
+            <input type="email" name="email" value={form.email} onChange={handleChange} required />
           </div>
-          <div className="auth-field">
-            <label>Email:</label>
-            <input type="email" name="email" value={form.email} onChange={handleChange} required style={{ width: '100%', boxSizing: 'border-box' }} />
-          </div>
-          <div className="auth-field">
-            <label>Password:</label>
+          <div className="signup-field">
+            <label>Password</label>
             <span style={{ position: 'relative', display: 'flex', width: '100%', alignItems: 'center' }}>
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -53,6 +54,7 @@ export default function Register() {
                 value={form.password}
                 onChange={handleChange}
                 required
+                minLength={6}
                 style={{ paddingRight: '2.2rem', width: '100%', boxSizing: 'border-box' }}
               />
               <button
@@ -76,11 +78,12 @@ export default function Register() {
                 {showPassword ? '🙈' : '👁️'}
               </button>
             </span>
+            <div className="signup-password-hint">Password must be at least 6 characters long</div>
           </div>
-          <button className="auth-btn" type="submit">Register</button>
+          <button className="signup-btn-dark" type="submit">Create account</button>
         </form>
-        {error && <p className="auth-error">{error}</p>}
-        {success && <p className="auth-success">{success}</p>}
+        {error && <p className="signup-error">{error}</p>}
+        {success && <p className="signup-success">{success}</p>}
       </div>
     </div>
   );

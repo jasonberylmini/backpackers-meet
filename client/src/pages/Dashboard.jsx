@@ -25,7 +25,6 @@ export default function Dashboard() {
 
   return (
     <div style={{ padding: '2rem' }}>
-      <h2>Dashboard</h2>
       <p>Welcome, <b>{user.name}</b>!</p>
       <p>Email: {user.email}</p>
       <p>Role: {user.role}</p>

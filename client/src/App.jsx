@@ -21,11 +21,10 @@ function AppRoutes() {
     <>
       {!isAdminRoute && (
         <header className="main-navbar">
-          <div className="navbar-logo">Backpacker</div>
+          <div className="navbar-logo">RideTribe</div>
           <nav className="navbar-links">
-            <Link to="/">Home</Link>
-            <Link to="/register">Register</Link>
             <Link to="/login">Login</Link>
+            <Link to="/register">Sign Up</Link>
           </nav>
         </header>
       )}
@@ -74,7 +73,7 @@ export default function App() {
     <Router>
       <AppRoutes />
       <Toaster 
-        position="top-right"
+        position="top-center"
         toastOptions={{
           duration: 3000,
           style: {
