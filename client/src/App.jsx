@@ -12,6 +12,7 @@ import AdminTrips from './pages/AdminTrips';
 import AdminReports from './pages/AdminReports';
 import AdminLogs from './pages/AdminLogs';
 import ProtectedRoute from './components/ProtectedRoute';
+import logo from '../assets/logo.png';
 
 function AppRoutes() {
   const location = useLocation();
@@ -21,7 +22,10 @@ function AppRoutes() {
     <>
       {!isAdminRoute && (
         <header className="main-navbar">
-          <div className="navbar-logo">RideTribe</div>
+          <Link to="/" className="navbar-logo" style={{ textDecoration: 'none' }}>
+            <img src={logo} alt="RideTribe Logo" className="logo-img" />
+            <span className="logo-text">RideTribe</span>
+          </Link>
           <nav className="navbar-links">
             <Link to="/login">Login</Link>
             <Link to="/register">Sign Up</Link>

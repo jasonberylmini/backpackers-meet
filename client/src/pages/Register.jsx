@@ -39,7 +39,7 @@ export default function Register() {
           <span className="signup-tab active">Sign Up</span>
         </div>
         <h2 className="signup-title">Create Account</h2>
-        <p className="signup-desc">Join Backpackr to connect with travelers around the world</p>
+        <p className="signup-desc">Join RideTribe to connect with travelers around the world</p>
         <form onSubmit={handleSubmit} className="signup-form">
           <div className="signup-field">
             <label>Email</label>

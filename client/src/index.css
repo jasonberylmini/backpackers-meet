@@ -23,13 +23,15 @@ form > div {
 }
 
 /* GLOBAL FIXES */
-html, body {
-  height: 100%;
+html, body, #root {
+  height: auto;
+  min-height: 100vh;
   margin: 0;
   padding: 0;
-  background: #070707;
-  overflow: hidden;
+  background: #fff;
+  color: #181f3a;
   box-sizing: border-box;
+  overflow: auto;
 }
 *, *:before, *:after {
   box-sizing: inherit;
@@ -41,12 +43,16 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 1rem 2rem;
-  background: #111;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(80, 80, 160, 0.08);
-  position: sticky;
+  background: linear-gradient(90deg, #eaf1fb 0%, #b6d0f7 100%);
+  color: #181f3a;
+  box-shadow: 0 2px 12px 0 rgba(34,48,91,0.08);
+  position: fixed;
   top: 0;
-  z-index: 10;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
 }
 .navbar-logo {
   font-size: 1.7rem;
@@ -62,7 +68,7 @@ html, body {
 }
 
 .navbar-links a {
-  color: #fff;
+  color: #181f3a;
   text-decoration: none;
   font-size: 1.1rem;
   font-weight: 500;
@@ -72,8 +78,8 @@ html, body {
 }
 
 .navbar-links a:hover, .navbar-links a.active {
-  background: #ffe082;
-  color: #4e54c8;
+  background: #2563eb;
+  color: #fff;
 }
 
 @media (max-width: 600px) {
@@ -209,19 +215,44 @@ input[type='password']::-webkit-textfield-decoration-container {
 } 
 
 /* --- Sign Up Page Dark Styles --- */
+/* --- Logo Blue Theme (Reverted, No Watermark) --- */
+/* --- Logo Image Background, White Header, Blue Logo Text --- */
+/* --- Modern Advanced Theme --- */
+.home-root {
+  margin-top: 64px; /* Reduced from 80px for a tighter fit */
+  height: auto;
+  min-height: 100vh;
+  overflow: auto;
+}
+
 .signup-bg-dark {
   min-height: 100vh;
-  height: 100vh;
-  background: #070707;
+  background: linear-gradient(120deg, #eaf1fb 0%, #b6d0f7 100%);
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
+.signup-bg-dark::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 600px;
+  height: 600px;
+  background: url('../assets/logo.png') no-repeat left center;
+  background-size: 500px auto;
+  opacity: 0.13;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 0;
+}
 .signup-card-dark {
-  background: #232323;
+  background: #3b5998;
   border-radius: 1.2rem;
-  box-shadow: 0 4px 32px rgba(0,0,0,0.45);
+  box-shadow: 0 8px 32px rgba(34,48,91,0.13), 0 2px 8px rgba(0,0,0,0.08);
+  border: 1.5px solid #eaf1fb;
   padding: 2.5rem 2rem 2rem 2rem;
   min-width: 340px;
   max-width: 370px;
@@ -229,12 +260,15 @@ input[type='password']::-webkit-textfield-decoration-container {
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+  z-index: 1;
 }
+
 .signup-tabs {
   display: flex;
   width: 100%;
   margin-bottom: 1.5rem;
-  background: #181818;
+  background: #16205b;
   border-radius: 0.8rem;
   overflow: hidden;
 }
@@ -252,7 +286,7 @@ input[type='password']::-webkit-textfield-decoration-container {
   text-decoration: none;
 }
 .signup-tab.active {
-  background: #111;
+  background: #2563eb;
   color: #fff;
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
@@ -313,8 +347,8 @@ input[type='password']::-webkit-textfield-decoration-container {
 }
 .signup-btn-dark {
   width: 100%;
-  background: #7ed957;
-  color: #181818;
+  background: #2563eb;
+  color: #fff;
   font-weight: 600;
   border: none;
   border-radius: 2rem;
@@ -325,7 +359,7 @@ input[type='password']::-webkit-textfield-decoration-container {
   transition: background 0.2s;
 }
 .signup-btn-dark:hover {
-  background: #6fcf3d;
+  background: #38bdf8;
 }
 .signup-error {
   color: #ff5252;
@@ -342,4 +376,27 @@ input[type='password']::-webkit-textfield-decoration-container {
     min-width: 90vw;
     padding: 1.2rem 0.5rem 1.5rem 0.5rem;
   }
+} 
+
+.logo-text {
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #2563eb;
+  text-shadow: 0 2px 8px #b6d0f7;
+  display: inline-block;
+  vertical-align: middle;
+} 
+
+.logo-img {
+  height: 40px;
+  width: auto;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.7rem;
+  filter: drop-shadow(0 2px 8px #b6d0f7);
+}
+.navbar-logo {
+  display: flex;
+  align-items: center;
 } 

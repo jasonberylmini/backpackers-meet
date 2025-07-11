@@ -32,24 +32,6 @@ export default function Home() {
           <p>Enter a date and city and RideTribe will show you all the travellers going there at the same time. If they match your interests, you can plan to meet or travel together.</p>
         </div>
       </section>
-
-      {/* Offers Section */}
-      <section className="offers">
-        <h2>Exclusive Travel Offers</h2>
-        <ul>
-          <li><img className="offer-icon" src="https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=40&q=80" alt="Pub Crawls" /> <b>Pub Crawls:</b> Discounted prices for RideTribe members who like to party.</li>
-          <li><img className="offer-icon" src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=40&q=80" alt="Cheap Food" /> <b>Cheap Food:</b> Know where to eat when arriving in a new city.</li>
-          <li><img className="offer-icon" src="https://images.unsplash.com/photo-1503676382389-4809596d5290?auto=format&fit=crop&w=40&q=80" alt="Hostel Deals" /> <b>Hostel Deals:</b> Book directly and pay less.</li>
-          <li><img className="offer-icon" src="https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=40&q=80" alt="Local Tours" /> <b>Local Tours:</b> Get the best offers from reputable companies.</li>
-          <li><img className="offer-icon" src="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=40&q=80" alt="Drink Specials & Free Events" /> <b>Drink Specials & Free Events:</b> Get notified of all the free events & offers nearby.</li>
-        </ul>
-      </section>
-
-      {/* Call to Action */}
-      <section className="cta-section">
-        <h2>Ready to start your adventure?</h2>
-        <a href="/register" className="cta-btn">Join the site Now!</a>
-      </section>
     </div>
   );
 } 
