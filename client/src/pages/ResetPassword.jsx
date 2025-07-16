@@ -51,7 +51,6 @@ const ResetPassword = () => {
 
   return (
     <div
-      className="signup-bg-dark"
       style={{
         minHeight: '100vh',
         display: 'flex',
