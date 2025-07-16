@@ -93,7 +93,8 @@ const ResetPassword = () => {
           <div style={{ height: 2, background: '#ef4444', opacity: 0.2, margin: '0 auto 18px auto', width: 60, borderRadius: 2 }} />
           <p className="signup-desc" style={{ textAlign: 'center', color: '#bbb', marginBottom: 24 }}>{error || 'This reset link has expired or is invalid.'}</p>
           <div style={{ textAlign: 'center', marginTop: 18 }}>
-            <Link to="/login" style={{ color: accent, textDecoration: 'underline', fontSize: 15 }}>Back to Login</Link>
+            <Link to="/login" style={{ color: accent, textDecoration: 'underline', fontSize: 15, marginRight: 16 }}>Back to Login</Link>
+            <Link to="/forgot-password" style={{ color: accent, textDecoration: 'underline', fontSize: 15 }}>Request new link</Link>
           </div>
         </div>
       </div>

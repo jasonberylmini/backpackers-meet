@@ -57,7 +57,7 @@ router.post('/update-profile',
   updateProfile
 );
 
-router.post('/forgot-password', forgotPassword);
+router.post('/forgot-password', authLimiter, forgotPassword);
 router.post('/reset-password', resetPassword);
 router.post('/validate-reset-token', validateResetToken);
 

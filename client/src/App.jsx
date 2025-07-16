@@ -14,6 +14,7 @@ import AdminLogs from './pages/AdminLogs';
 import ProtectedRoute from './components/ProtectedRoute';
 import logo from '../assets/logo.png';
 import ResetPassword from './pages/ResetPassword';
+import ForgotPassword from './pages/ForgotPassword';
 
 function AppRoutes() {
   const location = useLocation();
@@ -38,6 +39,7 @@ function AppRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/admin/dashboard" element={
