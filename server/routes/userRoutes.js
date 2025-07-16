@@ -6,7 +6,8 @@ import {
   getUnverifiedUsers,
   verifyUser,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  validateResetToken
 } from '../controllers/userController.js';
 import upload from '../middlewares/upload.js';
 import { body } from 'express-validator';
@@ -58,6 +59,7 @@ router.post('/update-profile',
 
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
+router.post('/validate-reset-token', validateResetToken);
 
 // ✅ Admin routes
 router.get('/admin/unverified', getUnverifiedUsers);

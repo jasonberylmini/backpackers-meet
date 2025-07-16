@@ -174,7 +174,7 @@ export const forgotPassword = async (req, res) => {
       to: user.email,
       from: process.env.EMAIL_USER,
       subject: 'Password Reset',
-      text: `You requested a password reset. Click the link to reset your password: ${resetUrl}\nIf you did not request this, please ignore this email.`
+      text: `You requested a password reset. Click the link to reset your password: ${resetUrl}\n\nThis link is valid for 5 minutes. If you did not request this, please ignore this email.`
     };
     await transporter.sendMail(mailOptions);
     return res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' });
@@ -203,6 +203,24 @@ export const resetPassword = async (req, res) => {
   } catch (err) {
     logger.error('Reset Password Error:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Validate Reset Token Controller
+export const validateResetToken = async (req, res) => {
+  const { token } = req.body;
+  try {
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+    if (!user) {
+      return res.status(200).json({ valid: false, message: 'This reset link has expired or is invalid.' });
+    }
+    return res.status(200).json({ valid: true });
+  } catch (err) {
+    logger.error('Validate Reset Token Error:', err);
+    res.status(500).json({ valid: false, message: 'Server error' });
   }
 };
 

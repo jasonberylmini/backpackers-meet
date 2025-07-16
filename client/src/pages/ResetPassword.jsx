@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 
 function useQuery() {
@@ -16,6 +16,34 @@ const ResetPassword = () => {
   const [confirm, setConfirm] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [tokenValid, setTokenValid] = useState(null); // null = loading, true = valid, false = invalid
+
+  useEffect(() => {
+    if (!token) {
+      setTokenValid(false);
+      setError('Invalid or missing token.');
+      return;
+    }
+    // Validate token with backend
+    fetch('/api/users/validate-reset-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.valid) {
+          setTokenValid(true);
+        } else {
+          setTokenValid(false);
+          setError(data.message || 'This reset link has expired or is invalid.');
+        }
+      })
+      .catch(() => {
+        setTokenValid(false);
+        setError('Server error. Please try again later.');
+      });
+  }, [token]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,8 +73,31 @@ const ResetPassword = () => {
     }
   };
 
-  if (!token) {
-    return <div>Invalid or missing token.</div>;
+  if (tokenValid === null) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #232336 0%, #3b2f63 50%, #232336 100%)' }}>
+        <div className="signup-card-dark" style={{ border: `2px solid ${accent}`, borderRadius: 18, boxShadow: `0 4px 32px 0 ${accent}22`, maxWidth: 400, width: '100%', padding: 32, background: 'rgba(30,32,40,0.98)', textAlign: 'center' }}>
+          <span style={{ fontSize: 32, color: accent }}>⏳</span>
+          <div style={{ color: '#bbb', marginTop: 16 }}>Checking link...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!token || tokenValid === false) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #232336 0%, #3b2f63 50%, #232336 100%)' }}>
+        <div className="signup-card-dark" style={{ border: `2px solid #ef4444`, borderRadius: 18, boxShadow: `0 4px 32px 0 #ef444422`, maxWidth: 400, width: '100%', padding: 32, background: 'rgba(30,32,40,0.98)', textAlign: 'center' }}>
+          <span style={{ fontSize: 48, color: '#ef4444', display: 'inline-block', marginBottom: 8 }}>⛔</span>
+          <h2 className="signup-title" style={{ color: '#ef4444', textAlign: 'center', marginBottom: 8 }}>Link Expired</h2>
+          <div style={{ height: 2, background: '#ef4444', opacity: 0.2, margin: '0 auto 18px auto', width: 60, borderRadius: 2 }} />
+          <p className="signup-desc" style={{ textAlign: 'center', color: '#bbb', marginBottom: 24 }}>{error || 'This reset link has expired or is invalid.'}</p>
+          <div style={{ textAlign: 'center', marginTop: 18 }}>
+            <Link to="/login" style={{ color: accent, textDecoration: 'underline', fontSize: 15 }}>Back to Login</Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
