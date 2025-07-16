@@ -4,7 +4,9 @@ import {
   loginUser,
   updateProfile,
   getUnverifiedUsers,
-  verifyUser
+  verifyUser,
+  forgotPassword,
+  resetPassword
 } from '../controllers/userController.js';
 import upload from '../middlewares/upload.js';
 import { body } from 'express-validator';
@@ -54,6 +56,8 @@ router.post('/update-profile',
   updateProfile
 );
 
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 // ✅ Admin routes
 router.get('/admin/unverified', getUnverifiedUsers);

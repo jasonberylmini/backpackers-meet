@@ -13,14 +13,16 @@ import AdminReports from './pages/AdminReports';
 import AdminLogs from './pages/AdminLogs';
 import ProtectedRoute from './components/ProtectedRoute';
 import logo from '../assets/logo.png';
+import ResetPassword from './pages/ResetPassword';
 
 function AppRoutes() {
   const location = useLocation();
   // Hide header on admin pages
   const isAdminRoute = location.pathname.startsWith('/admin');
+  const isResetPasswordRoute = location.pathname.startsWith('/reset-password');
   return (
     <>
-      {!isAdminRoute && (
+      {!(isAdminRoute || isResetPasswordRoute) && (
         <header className="main-navbar">
           <Link to="/" className="navbar-logo" style={{ textDecoration: 'none' }}>
             <img src={logo} alt="RideTribe Logo" className="logo-img" />
@@ -36,6 +38,7 @@ function AppRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/admin/dashboard" element={
           <ProtectedRoute requiredRole="admin">

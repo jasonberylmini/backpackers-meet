@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config();
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -14,6 +14,7 @@ import reviewRoutes from './routes/reviewRoutes.js';
 import flagRoutes from './routes/flagRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js';
 
+dotenv.config();
 // Environment variable checks
 if (!process.env.MONGO_URI) {
   console.error('❌ MONGO_URI is not set in environment variables.');

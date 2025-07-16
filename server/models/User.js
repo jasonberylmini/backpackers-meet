@@ -51,6 +51,10 @@ const userSchema = new mongoose.Schema({
 
   profileImage: { type: String }, // file path or URL to profile image
 
+  // For password reset
+  resetPasswordToken: { type: String },
+  resetPasswordExpires: { type: Date },
+
   createdAt: {
     type: Date,
     default: Date.now

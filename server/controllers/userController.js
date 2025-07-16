@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import AdminLog from '../models/AdminLog.js';
 import { validationResult } from 'express-validator';
 import winston from 'winston';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()]
@@ -141,6 +143,66 @@ export const verifyUser = async (req, res) => {
   } catch (err) {
     logger.error("Verification error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Forgot Password Controller
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      // Always respond with success to prevent email enumeration
+      return res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' });
+    }
+    // Generate token
+    const token = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    await user.save();
+
+    // Send email
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const mailOptions = {
+      to: user.email,
+      from: process.env.EMAIL_USER,
+      subject: 'Password Reset',
+      text: `You requested a password reset. Click the link to reset your password: ${resetUrl}\nIf you did not request this, please ignore this email.`
+    };
+    await transporter.sendMail(mailOptions);
+    return res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' });
+  } catch (err) {
+    logger.error('Forgot Password Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Reset Password Controller
+export const resetPassword = async (req, res) => {
+  const { token, password } = req.body;
+  try {
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired token.' });
+    }
+    user.passwordHash = await bcrypt.hash(password, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+    res.status(200).json({ message: 'Password has been reset successfully.' });
+  } catch (err) {
+    logger.error('Reset Password Error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
