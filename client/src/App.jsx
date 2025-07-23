@@ -15,6 +15,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import logo from '../assets/logo.png';
 import ResetPassword from './pages/ResetPassword';
 import ForgotPassword from './pages/ForgotPassword';
+import AdminReviews from './pages/AdminReviews';
 
 function AppRoutes() {
   const location = useLocation();
@@ -70,6 +71,11 @@ function AppRoutes() {
         <Route path="/admin/logs" element={
           <ProtectedRoute requiredRole="admin">
             <AdminLogs />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/reviews" element={
+          <ProtectedRoute requiredRole="admin">
+            <AdminReviews />
           </ProtectedRoute>
         } />
       </Routes>

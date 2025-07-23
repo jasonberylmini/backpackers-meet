@@ -70,41 +70,72 @@ export const getReports = async (req, res) => {
     if (type === 'flag') {
       // Flag summary
       const totalFlags = await Flag.countDocuments();
-      const userFlags = await Flag.countDocuments({ type: 'user' });
-      const reviewFlags = await Flag.countDocuments({ type: 'review' });
-      const topFlaggedUsersAgg = await Flag.aggregate([
-        { $match: { type: 'user' } },
-        { $group: { _id: '$targetId', count: { $sum: 1 } } },
+      const userFlagsCount = await Flag.countDocuments({ flagType: 'user' });
+      const tripFlagsCount = await Flag.countDocuments({ flagType: 'trip' });
+      const reviewFlagsCount = await Flag.countDocuments({ flagType: 'review' });
+
+      // User flags
+      const userFlagsAgg = await Flag.aggregate([
+        { $match: { flagType: 'user' } },
+        { $group: { _id: { targetId: '$targetId', reason: '$reason' }, count: { $sum: 1 } } },
         { $sort: { count: -1 } },
-        { $limit: 3 }
+        { $limit: 10 }
       ]);
-      const topFlaggedUsers = await User.find({ _id: { $in: topFlaggedUsersAgg.map(u => u._id) } })
-        .select('name email')
-        .lean();
-      const topUsers = topFlaggedUsersAgg.map(u => {
-        const user = topFlaggedUsers.find(usr => usr._id.toString() === u._id.toString());
-        return user ? { ...user, count: u.count } : null;
-      }).filter(Boolean);
-      const topFlaggedReviewsAgg = await Flag.aggregate([
-        { $match: { type: 'review' } },
-        { $group: { _id: '$targetId', count: { $sum: 1 } } },
+      const userIds = userFlagsAgg.map(f => f._id.targetId);
+      const userMap = Object.fromEntries((await User.find({ _id: { $in: userIds } }).select('name email preferences gender').lean()).map(u => [u._id.toString(), u]));
+      const userFlags = userFlagsAgg.map(f => ({
+        _id: f._id.targetId,
+        targetName: userMap[f._id.targetId]?.name || 'Unknown',
+        targetEmail: userMap[f._id.targetId]?.email || '-',
+        preferences: userMap[f._id.targetId]?.preferences || '',
+        gender: userMap[f._id.targetId]?.gender || '',
+        reason: f._id.reason,
+        count: f.count
+      }));
+
+      // Trip flags
+      const tripFlagsAgg = await Flag.aggregate([
+        { $match: { flagType: 'trip' } },
+        { $group: { _id: { targetId: '$targetId', reason: '$reason' }, count: { $sum: 1 } } },
         { $sort: { count: -1 } },
-        { $limit: 3 }
+        { $limit: 10 }
       ]);
-      const topFlaggedReviews = await Review.find({ _id: { $in: topFlaggedReviewsAgg.map(r => r._id) } })
-        .select('comment rating tripId reviewer')
-        .populate('reviewer', 'name email')
-        .lean();
-      const topReviews = topFlaggedReviewsAgg.map(r => {
-        const review = topFlaggedReviews.find(rv => rv._id.toString() === r._id.toString());
-        return review ? { ...review, count: r.count } : null;
-      }).filter(Boolean);
+      const tripIds = tripFlagsAgg.map(f => f._id.targetId);
+      const tripMap = Object.fromEntries((await Trip.find({ _id: { $in: tripIds } }).select('destination date').lean()).map(t => [t._id.toString(), t]));
+      const tripFlags = tripFlagsAgg.map(f => ({
+        _id: f._id.targetId,
+        targetDestination: tripMap[f._id.targetId]?.destination || 'Unknown',
+        tripDate: tripMap[f._id.targetId]?.date || '',
+        reason: f._id.reason,
+        count: f.count
+      }));
+
+      // Review flags
+      const reviewFlagsAgg = await Flag.aggregate([
+        { $match: { flagType: 'review' } },
+        { $group: { _id: { targetId: '$targetId', reason: '$reason' }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ]);
+      const reviewIds = reviewFlagsAgg.map(f => f._id.targetId);
+      const reviewMap = Object.fromEntries((await Review.find({ _id: { $in: reviewIds } }).select('feedback reviewer rating tags').populate('reviewer', 'name email').lean()).map(r => [r._id.toString(), r]));
+      const reviewFlags = reviewFlagsAgg.map(f => ({
+        _id: f._id.targetId,
+        comment: reviewMap[f._id.targetId]?.feedback || '',
+        reviewer: reviewMap[f._id.targetId]?.reviewer || null,
+        rating: reviewMap[f._id.targetId]?.rating || null,
+        tags: reviewMap[f._id.targetId]?.tags || [],
+        reason: f._id.reason,
+        count: f.count
+      }));
+
       return res.status(200).json({
         reportType: 'flag',
         totalFlags,
-        byType: { user: userFlags, review: reviewFlags },
-        topFlaggedUsers: topUsers,
-        topFlaggedReviews: topReviews
+        byType: { user: userFlagsCount, trip: tripFlagsCount, review: reviewFlagsCount },
+        userFlags,
+        tripFlags,
+        reviewFlags
       });
     }
     if (type === 'trip') {
@@ -206,6 +237,134 @@ export const deleteTrip = async (req, res) => {
     if (!deleted) return res.status(404).json({ message: 'Trip not found' });
     res.status(200).json({ message: 'Trip deleted' });
   } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get all flags for a specific user, trip, or review
+export const getFlagsForTarget = async (req, res) => {
+  try {
+    const { flagType, targetId } = req.params;
+    if (!['user', 'trip', 'review'].includes(flagType)) {
+      return res.status(400).json({ message: 'Invalid flag type.' });
+    }
+    const flags = await Flag.find({ flagType, targetId })
+      .populate('flaggedBy', 'name email')
+      .sort({ createdAt: -1 });
+    res.status(200).json(flags);
+  } catch (err) {
+    logger.error('Fetch Flags For Target Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Dismiss a flag
+export const dismissFlag = async (req, res) => {
+  try {
+    const { flagId } = req.params;
+    await Flag.findByIdAndUpdate(flagId, { status: 'dismissed' });
+    res.status(200).json({ message: 'Flag dismissed.' });
+  } catch (err) {
+    logger.error('Dismiss Flag Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Resolve a flag (after ban/delete)
+export const resolveFlag = async (req, res) => {
+  try {
+    const { flagId } = req.params;
+    await Flag.findByIdAndUpdate(flagId, { status: 'resolved' });
+    res.status(200).json({ message: 'Flag resolved.' });
+  } catch (err) {
+    logger.error('Resolve Flag Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Update getAllFlags to filter by status
+export const getAllFlags = async (req, res) => {
+  try {
+    const { flagType, reason, page = 1, limit = 20, status = 'open' } = req.query;
+    const filter = {};
+    if (flagType) filter.flagType = flagType;
+    if (reason) filter.reason = reason;
+    if (status) filter.status = status;
+    const skip = (Number(page) - 1) * Number(limit);
+    let flags = await Flag.find(filter)
+      .populate('flaggedBy', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
+    // Populate target details
+    for (const flag of flags) {
+      if (flag.flagType === 'user') {
+        const user = await User.findById(flag.targetId).select('name email').lean();
+        flag.targetName = user?.name || '-';
+        flag.targetEmail = user?.email || '-';
+      } else if (flag.flagType === 'trip') {
+        const trip = await Trip.findById(flag.targetId).select('destination').lean();
+        flag.targetDestination = trip?.destination || '-';
+      } else if (flag.flagType === 'review') {
+        const review = await Review.findById(flag.targetId).select('feedback').lean();
+        flag.targetComment = review?.feedback || '-';
+      }
+    }
+    const total = await Flag.countDocuments(filter);
+    res.status(200).json({ flags, total });
+  } catch (err) {
+    logger.error('Fetch All Flags Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get notification count for a target
+export const getNotificationCount = async (req, res) => {
+  try {
+    const { flagType, targetId } = req.params;
+    let count = 0;
+    if (flagType === 'user') {
+      const user = await User.findById(targetId);
+      count = user?.moderation?.notificationCount || 0;
+    } else if (flagType === 'trip') {
+      const trip = await Trip.findById(targetId);
+      count = trip?.moderation?.notificationCount || 0;
+    } else if (flagType === 'review') {
+      const review = await Review.findById(targetId);
+      count = review?.moderation?.notificationCount || 0;
+    }
+    res.status(200).json({ count });
+  } catch (err) {
+    logger.error('Get Notification Count Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Increment notification count for a target
+export const incrementNotificationCount = async (req, res) => {
+  try {
+    const { flagType, targetId } = req.params;
+    let count = 0;
+    if (flagType === 'user') {
+      const user = await User.findById(targetId);
+      user.moderation.notificationCount = (user.moderation.notificationCount || 0) + 1;
+      await user.save();
+      count = user.moderation.notificationCount;
+    } else if (flagType === 'trip') {
+      const trip = await Trip.findById(targetId);
+      trip.moderation.notificationCount = (trip.moderation.notificationCount || 0) + 1;
+      await trip.save();
+      count = trip.moderation.notificationCount;
+    } else if (flagType === 'review') {
+      const review = await Review.findById(targetId);
+      review.moderation.notificationCount = (review.moderation.notificationCount || 0) + 1;
+      await review.save();
+      count = review.moderation.notificationCount;
+    }
+    res.status(200).json({ count });
+  } catch (err) {
+    logger.error('Increment Notification Count Error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };

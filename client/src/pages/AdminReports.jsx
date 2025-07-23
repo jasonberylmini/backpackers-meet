@@ -22,6 +22,19 @@ export default function AdminReports() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('flag');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalFlags, setModalFlags] = useState([]);
+  const [modalTitle, setModalTitle] = useState('');
+  const [allFlags, setAllFlags] = useState([]);
+  const [flagsPage, setFlagsPage] = useState(1);
+  const [flagsTotal, setFlagsTotal] = useState(0);
+  const [flagsLoading, setFlagsLoading] = useState(false);
+  const FLAGS_LIMIT = 10;
+  const [modalTarget, setModalTarget] = useState({});
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [resolvedFlags, setResolvedFlags] = useState([]);
+  const [dismissedFlags, setDismissedFlags] = useState([]);
+  const [modalError, setModalError] = useState(null);
 
   const fetchSummary = async (type) => {
     setLoading(true);
@@ -39,8 +52,92 @@ export default function AdminReports() {
     }
   };
 
+  const handleViewDetails = async (flag) => {
+    setModalOpen(true);
+    setModalFlags([]);
+    setModalTitle('');
+    setModalTarget(null);
+    setNotificationCount(0);
+    setModalError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      // Fetch all flag submissions for this target
+      const res = await axios.get(`/api/admin/flags/${flag.flagType}/${flag.targetId}`, { headers });
+      setModalFlags(res.data);
+      setModalTitle(
+        flag.flagType === 'user' ? `Flags for ${flag.targetName} (${flag.targetEmail})` :
+        flag.flagType === 'trip' ? `Flags for ${flag.targetDestination}` :
+        flag.flagType === 'review' ? `Flags for review: ${flag.targetComment?.slice(0, 30)}` :
+        'Flag Details'
+      );
+      setModalTarget(flag);
+      // Fetch notification count
+      const notifRes = await axios.get(`/api/admin/notification-count/${flag.flagType}/${flag.targetId}`, { headers });
+      setNotificationCount(notifRes.data.count);
+    } catch (err) {
+      setModalError('Failed to load flag details.');
+    }
+  };
+
+  const fetchAllFlags = async (page = 1) => {
+    setFlagsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.get(`/api/admin/all-flags?page=${page}&limit=${FLAGS_LIMIT}` , { headers });
+      setAllFlags(res.data.flags);
+      setFlagsTotal(res.data.total);
+      setFlagsLoading(false);
+    } catch {
+      setFlagsLoading(false);
+    }
+  };
+
+  // Fetch resolved/dismissed flags
+  const fetchResolvedFlags = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      const res1 = await axios.get(`/api/admin/all-flags?status=resolved`, { headers });
+      setResolvedFlags(res1.data.flags);
+      const res2 = await axios.get(`/api/admin/all-flags?status=dismissed`, { headers });
+      setDismissedFlags(res2.data.flags);
+    } catch {}
+  };
+
+  // Moderation actions
+  const handleDeleteTarget = async () => {
+    alert(`Delete action for: ${modalTarget.display || modalTitle}`);
+    // TODO: Call backend endpoint to delete trip/review, then resolve flag
+    await axios.patch(`/api/admin/flags/${modalFlags[0]._id}/resolve`);
+    setModalOpen(false);
+    fetchAllFlags(flagsPage);
+    fetchResolvedFlags();
+  };
+  const handleBanUser = async () => {
+    alert(`Ban action for: ${modalTarget.display || modalTitle}`);
+    // TODO: Call backend endpoint to ban user, then resolve flag
+    await axios.patch(`/api/admin/flags/${modalFlags[0]._id}/resolve`);
+    setModalOpen(false);
+    fetchAllFlags(flagsPage);
+    fetchResolvedFlags();
+  };
+  const handleDismissFlag = async () => {
+    await axios.patch(`/api/admin/flags/${modalFlags[0]._id}/dismiss`);
+    setModalOpen(false);
+    fetchAllFlags(flagsPage);
+    fetchResolvedFlags();
+  };
+  const notificationColor = notificationCount === 0 ? '#43a047' : notificationCount === 1 ? '#fbc02d' : '#d32f2f';
+  const notificationText = notificationCount < 3 ? `Send Notification (${3 - notificationCount} left)` : 'Send Notification';
+
   useEffect(() => {
     fetchSummary(activeTab);
+    if (activeTab === 'flag') {
+      fetchAllFlags(flagsPage);
+      fetchResolvedFlags();
+    }
     // eslint-disable-next-line
   }, [activeTab]);
 
@@ -99,6 +196,121 @@ export default function AdminReports() {
   const numberStyle = { color: '#4e54c8', fontWeight: 700, marginRight: 6 };
   const labelStyle = { color: '#888', fontWeight: 400 };
 
+  // Robust modal rendering with error boundary
+  const renderModal = () => {
+    if (!modalOpen) return null;
+    if (modalError) {
+      return (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.35)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 12, maxWidth: 480, width: '90vw', padding: 28, position: 'relative' }}>
+            <button onClick={() => setModalOpen(false)} style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }} aria-label="Close">×</button>
+            <div style={{ color: 'red', fontWeight: 600 }}>{modalError}</div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.35)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ background: '#fff', borderRadius: 12, maxWidth: 480, width: '90vw', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(34,48,91,0.13)', padding: 28, position: 'relative' }}>
+          <button onClick={() => setModalOpen(false)} style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }} aria-label="Close">×</button>
+          <h2 style={{ marginBottom: 12, color: '#4e54c8', fontSize: 22 }}>{modalTitle}</h2>
+          {/* Contextual Preview */}
+          {modalTarget?.type === 'user' && (
+            <div style={{ marginBottom: 10, color: '#222' }}>
+              {modalTarget.preferences && <div><b>Preferences:</b> {modalTarget.preferences}</div>}
+              {modalTarget.gender && <div><b>Gender:</b> {modalTarget.gender}</div>}
+            </div>
+          )}
+          {modalTarget?.type === 'trip' && (
+            <div style={{ marginBottom: 10, color: '#222' }}>
+              {modalTarget.targetDestination && <div><b>Destination:</b> {modalTarget.targetDestination}</div>}
+              {modalTarget.tripDate && <div><b>Date:</b> {modalTarget.tripDate}</div>}
+            </div>
+          )}
+          {modalTarget?.type === 'review' && (
+            <div style={{ marginBottom: 10, color: '#222' }}>
+              {modalTarget.targetComment && <div><b>Feedback:</b> {modalTarget.targetComment}</div>}
+              {modalTarget.rating && <div><b>Rating:</b> {modalTarget.rating}★</div>}
+              {modalTarget.tags && modalTarget.tags.length > 0 && <div><b>Tags:</b> {modalTarget.tags.join(', ')}</div>}
+            </div>
+          )}
+          {modalFlags.length === 0 ? (
+            <div style={{ color: '#bbb', textAlign: 'center' }}>No flag submissions found.</div>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {modalFlags.map((flag, i) => (
+                <li key={flag._id || i} style={{ marginBottom: 18, borderBottom: '1px solid #eee', paddingBottom: 10 }}>
+                  <div style={{ fontWeight: 600, color: '#4e54c8' }}>{flag.reason}</div>
+                  <div style={{ color: '#222', margin: '4px 0 6px 0' }}>Reported by: {flag.flaggedBy?.name || 'Unknown'} ({flag.flaggedBy?.email || '-'})</div>
+                  <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>Date: {new Date(flag.createdAt).toLocaleString()}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Moderation actions (implement handlers as needed) */}
+            {/* Approve/Dismiss Flag (all types) */}
+            <button style={{ fontSize: 14, color: '#43a047', background: 'none', border: '1px solid #43a047', borderRadius: 8, padding: '8px 15px', cursor: 'pointer' }} onClick={handleDismissFlag}>
+              ✅ Approve / Dismiss Flag
+            </button>
+            {/* Delete (all types) */}
+            <button style={{ fontSize: 14, color: '#d32f2f', background: 'none', border: '1px solid #d32f2f', borderRadius: 8, padding: '8px 15px', cursor: 'pointer' }} onClick={handleDeleteTarget}>
+              🚫 {modalTarget?.type === 'user' ? 'Delete User' : modalTarget?.type === 'trip' ? 'Delete Trip' : modalTarget?.type === 'review' ? 'Delete Review' : 'Delete'}
+            </button>
+            {/* Edit (review/trip only) */}
+            {(modalTarget?.type === 'review' || modalTarget?.type === 'trip') && (
+              <button style={{ fontSize: 14, color: '#4e54c8', background: 'none', border: '1px solid #4e54c8', borderRadius: 8, padding: '8px 15px', cursor: 'pointer' }} onClick={handleEditTarget}>
+                📝 Edit {modalTarget?.type === 'review' ? 'Review' : 'Trip'} Details
+              </button>
+            )}
+            {/* Warn/Message User (user only) */}
+            {modalTarget?.type === 'user' && (
+              <button style={{ fontSize: 14, color: '#fbc02d', background: 'none', border: '1px solid #fbc02d', borderRadius: 8, padding: '8px 15px', cursor: 'pointer' }} onClick={handleWarnUser}>
+                👤 Warn or Message User
+              </button>
+            )}
+            {/* Suspend/Ban User (user only) */}
+            {modalTarget?.type === 'user' && (
+              <button style={{ fontSize: 14, color: '#d32f2f', background: 'none', border: '1px solid #d32f2f', borderRadius: 8, padding: '8px 15px', cursor: 'pointer' }} onClick={handleBanUser}>
+                🚷 Suspend or Ban User
+              </button>
+            )}
+            {/* View Related Flags (all types) */}
+            <button style={{ fontSize: 14, color: '#4e54c8', background: 'none', border: '1px solid #4e54c8', borderRadius: 8, padding: '8px 15px', cursor: 'pointer' }} onClick={handleViewRelatedFlags}>
+              📂 View Related Flags
+            </button>
+            <button style={{ fontSize: 12, color: '#888', background: 'none', border: '1px solid #888', borderRadius: 8, padding: '8px 15px', cursor: 'pointer' }} onClick={() => setModalOpen(false)}>Close</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Handler stubs for new actions
+  const handleEditTarget = () => {
+    alert(`Edit action for: ${modalTarget?.display || modalTitle}`);
+    // TODO: Implement edit modal or redirect
+  };
+  const handleWarnUser = () => {
+    alert(`Warn/Message action for: ${modalTarget?.display || modalTitle}`);
+    // TODO: Implement warn/message modal
+  };
+  const handleViewRelatedFlags = () => {
+    alert(`View related flags for: ${modalTarget?.display || modalTitle}`);
+    // TODO: Implement related flags view
+  };
+
+  const fetchFlagDetails = (flagType, targetId, modalTitle, modalTarget) => {
+    // Compose a flag object compatible with handleViewDetails
+    const flag = {
+      flagType,
+      targetId,
+      // For modal title and display, pass through extra info
+      ...modalTarget,
+    };
+    handleViewDetails(flag);
+  };
+
   return (
     <div className="admin-dashboard-root">
       <Sidebar />
@@ -147,17 +359,23 @@ export default function AdminReports() {
                     {summary.reportType === 'flag' && (
                       <>
                         <div style={sectionTitle}>Total Flags: <span style={{ color: '#222', fontWeight: 600 }}>{summary.totalFlags ?? '-'}</span></div>
-                        <div style={{ marginBottom: 12 }}><span style={sectionTitle}>By Type:</span> <span style={labelStyle}>User:</span> {summary.byType?.user ?? '-'}, <span style={labelStyle}>Review:</span> {summary.byType?.review ?? '-'}</div>
-                        <div style={sectionTitle}>Top 3 Flagged Users:</div>
+                        <div style={{ marginBottom: 12 }}><span style={sectionTitle}>By Type:</span> <span style={labelStyle}>User:</span> {summary.byType?.user ?? '-'}, <span style={labelStyle}>Trip:</span> {summary.byType?.trip ?? '-'}, <span style={labelStyle}>Review:</span> {summary.byType?.review ?? '-'}</div>
+                        <div style={sectionTitle}>Flagged Users:</div>
                         <ol style={listStyle}>
-                          {Array.isArray(summary.topFlaggedUsers) && summary.topFlaggedUsers.length > 0 ? summary.topFlaggedUsers.map((u) => (
-                            <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span> <b>- {u.count} flags</b></li>
+                          {Array.isArray(summary.userFlags) && summary.userFlags.length > 0 ? summary.userFlags.map((f, i) => (
+                            <li key={f._id}><b>{i + 1}.</b> {f.targetName} <span style={labelStyle}>({f.targetEmail})</span> <b>- {f.count} flags</b> <span style={labelStyle}>Reason: {f.reason}</span> <button style={{ fontSize: 12, color: '#4e54c8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginLeft: 8 }} onClick={() => fetchFlagDetails('user', f._id, `Flags for ${f.targetName}`, { targetName: f.targetName, targetEmail: f.targetEmail, type: 'user', id: f._id })}>View Details</button></li>
                           )) : <li style={labelStyle}>None</li>}
                         </ol>
-                        <div style={sectionTitle}>Top 3 Flagged Reviews:</div>
+                        <div style={sectionTitle}>Flagged Trips:</div>
                         <ol style={listStyle}>
-                          {Array.isArray(summary.topFlaggedReviews) && summary.topFlaggedReviews.length > 0 ? summary.topFlaggedReviews.map((r) => (
-                            <li key={r._id}><span style={{ fontStyle: 'italic' }}>{r.comment ? `"${r.comment}"` : 'No comment'}</span> (Rating: {r.rating}) <b>- {r.count} flags</b>{r.reviewer && (<span style={labelStyle}> by {r.reviewer.name} ({r.reviewer.email})</span>)}</li>
+                          {Array.isArray(summary.tripFlags) && summary.tripFlags.length > 0 ? summary.tripFlags.map((f, i) => (
+                            <li key={f._id}><b>{i + 1}.</b> {f.targetDestination || 'Unknown'} <b>- {f.count} flags</b> <span style={labelStyle}>Reason: {f.reason}</span> <button style={{ fontSize: 12, color: '#4e54c8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginLeft: 8 }} onClick={() => fetchFlagDetails('trip', f._id, `Flags for ${f.targetDestination}`, { targetDestination: f.targetDestination, type: 'trip', id: f._id })}>View Details</button></li>
+                          )) : <li style={labelStyle}>None</li>}
+                        </ol>
+                        <div style={sectionTitle}>Flagged Reviews:</div>
+                        <ol style={listStyle}>
+                          {Array.isArray(summary.reviewFlags) && summary.reviewFlags.length > 0 ? summary.reviewFlags.map((f, i) => (
+                            <li key={f._id}><b>{i + 1}.</b> <span style={{ fontStyle: 'italic' }}>{f.comment ? `"${f.comment}"` : 'No comment'}</span> <b>- {f.count} flags</b> <span style={labelStyle}>Reason: {f.reason}</span> <button style={{ fontSize: 12, color: '#4e54c8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginLeft: 8 }} onClick={() => fetchFlagDetails('review', f._id, `Flags for review: ${f.comment?.slice(0, 30)}`, { targetComment: f.comment, type: 'review', id: f._id })}>View Details</button></li>
                           )) : <li style={labelStyle}>None</li>}
                         </ol>
                       </>
@@ -202,8 +420,112 @@ export default function AdminReports() {
                 </div>
               </div>
             )}
+            {activeTab === 'flag' && (
+              <>
+                <div style={{ marginTop: 32 }}>
+                  <h2 style={{ color: '#4e54c8', fontWeight: 700, fontSize: '1.2rem', marginBottom: 10 }}>All Flag Submissions</h2>
+                  {flagsLoading ? (
+                    <div style={{ color: '#bbb', padding: 20 }}>Loading flags...</div>
+                  ) : (
+                    <>
+                      <table className="admin-dashboard-table">
+                        <thead>
+                          <tr>
+                            <th>Type</th>
+                            <th>Target</th>
+                            <th>Reason</th>
+                            <th>Reporter</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allFlags.map(flag => (
+                            <tr key={flag._id}>
+                              <td>{flag.flagType}</td>
+                              <td>{
+                                flag.flagType === 'user' ? `${flag.targetName} (${flag.targetEmail})` :
+                                flag.flagType === 'trip' ? flag.targetDestination :
+                                flag.flagType === 'review' ? flag.targetComment :
+                                '-'
+                              }</td>
+                              <td>{flag.reason}</td>
+                              <td>{flag.flaggedBy?.name || 'Unknown'} ({flag.flaggedBy?.email || '-'})</td>
+                              <td>{new Date(flag.createdAt).toLocaleString()}</td>
+                              <td>
+                                <button style={{ fontSize: 12, color: '#4e54c8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => handleViewDetails(flag)}>View Details</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {flagsTotal > FLAGS_LIMIT && (
+                        <div className="admin-dashboard-table-pagination">
+                          <button onClick={() => setFlagsPage(p => Math.max(1, p - 1))} disabled={flagsPage === 1}>Prev</button>
+                          <span>Page {flagsPage} of {Math.ceil(flagsTotal / FLAGS_LIMIT)}</span>
+                          <button onClick={() => setFlagsPage(p => Math.min(Math.ceil(flagsTotal / FLAGS_LIMIT), p + 1))} disabled={flagsPage === Math.ceil(flagsTotal / FLAGS_LIMIT)}>Next</button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                {/* Resolved Flags Table */}
+                <div style={{ marginTop: 32 }}>
+                  <h2 style={{ color: '#43a047', fontWeight: 700, fontSize: '1.1rem', marginBottom: 10 }}>Resolved Flags</h2>
+                  <table className="admin-dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Target</th>
+                        <th>Reason</th>
+                        <th>Reporter</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resolvedFlags.length === 0 ? <tr><td colSpan={5} style={{ color: '#bbb', textAlign: 'center' }}>No resolved flags.</td></tr> : resolvedFlags.map(flag => (
+                        <tr key={flag._id}>
+                          <td>{flag.flagType}</td>
+                          <td>{flag.flagType === 'user' ? `${flag.targetName} (${flag.targetEmail})` : flag.flagType === 'trip' ? flag.targetDestination : flag.flagType === 'review' ? flag.targetComment : '-'}</td>
+                          <td>{flag.reason}</td>
+                          <td>{flag.flaggedBy?.name || 'Unknown'} ({flag.flaggedBy?.email || '-'})</td>
+                          <td>{new Date(flag.createdAt).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Dismissed Flags Table */}
+                <div style={{ marginTop: 32 }}>
+                  <h2 style={{ color: '#888', fontWeight: 700, fontSize: '1.1rem', marginBottom: 10 }}>Dismissed Flags</h2>
+                  <table className="admin-dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Target</th>
+                        <th>Reason</th>
+                        <th>Reporter</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dismissedFlags.length === 0 ? <tr><td colSpan={5} style={{ color: '#bbb', textAlign: 'center' }}>No dismissed flags.</td></tr> : dismissedFlags.map(flag => (
+                        <tr key={flag._id}>
+                          <td>{flag.flagType}</td>
+                          <td>{flag.flagType === 'user' ? `${flag.targetName} (${flag.targetEmail})` : flag.flagType === 'trip' ? flag.targetDestination : flag.flagType === 'review' ? flag.targetComment : '-'}</td>
+                          <td>{flag.reason}</td>
+                          <td>{flag.flaggedBy?.name || 'Unknown'} ({flag.flaggedBy?.email || '-'})</td>
+                          <td>{new Date(flag.createdAt).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         </main>
+        {renderModal()}
       </div>
     </div>
   );

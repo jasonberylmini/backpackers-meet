@@ -1,20 +1,24 @@
-import Flag from '../models/Flag.js';
+import Flag, { USER_REASONS, TRIP_REASONS, REVIEW_REASONS } from '../models/Flag.js';
 
 export const submitFlag = async (req, res) => {
   try {
-    const { type, targetId, reason } = req.body;
-
-    if (!['user', 'review'].includes(type)) {
+    const { flagType, targetId, reason } = req.body;
+    if (!['user', 'trip', 'review'].includes(flagType)) {
       return res.status(400).json({ message: 'Invalid flag type.' });
     }
-
+    let validReasons = [];
+    if (flagType === 'user') validReasons = USER_REASONS;
+    if (flagType === 'trip') validReasons = TRIP_REASONS;
+    if (flagType === 'review') validReasons = REVIEW_REASONS;
+    if (!validReasons.includes(reason)) {
+      return res.status(400).json({ message: 'Invalid reason for this flag type.' });
+    }
     const flag = new Flag({
       flaggedBy: req.user.userId,
-      type,
+      flagType,
       targetId,
       reason
     });
-
     await flag.save();
     res.status(201).json({ message: 'Flag submitted.', flag });
   } catch (err) {

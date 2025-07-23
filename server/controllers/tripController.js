@@ -9,22 +9,26 @@ const logger = winston.createLogger({
 
 export const createTrip = async (req, res) => {
   try {
-    const { destination, date, budget, tripType } = req.body;
-
-    if (!destination || !date || !budget || !tripType) {
-      return res.status(400).json({ message: "All fields are required." });
+    // KYC check
+    const user = await User.findById(req.user.userId);
+    if (!user || user.verificationStatus !== 'verified') {
+      return res.status(403).json({ message: 'KYC verification required to create trips.' });
     }
-
+    const { destination, startDate, endDate, budget, tripType, description } = req.body;
+    if (!destination || !startDate || !endDate || !budget || !tripType) {
+      return res.status(400).json({ message: "All fields (destination, startDate, endDate, budget, tripType) are required." });
+    }
     const newTrip = new Trip({
       creator: req.user.userId,
       destination,
-      date,
+      startDate,
+      endDate,
       budget,
-      tripType
+      tripType,
+      description,
+      members: [req.user.userId]
     });
-
     await newTrip.save();
-
     res.status(201).json({
       message: "Trip created successfully!",
       trip: newTrip
@@ -55,6 +59,13 @@ export const joinTrip = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
+    // KYC check
+    const user = await User.findById(req.user.userId);
+    if (!user || user.verificationStatus !== 'verified') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({ message: 'KYC verification required to join trips.' });
+    }
     const { tripId } = req.params;
     const userId = req.user.userId;
 
@@ -141,6 +152,35 @@ export const leaveTrip = async (req, res) => {
     session.endSession();
     logger.error("Leave Trip Error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const updateTrip = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const userId = req.user.userId;
+    const trip = await Trip.findById(tripId);
+    if (!trip) {
+      return res.status(404).json({ message: 'Trip not found.' });
+    }
+    if (!trip.creator.equals(userId)) {
+      return res.status(403).json({ message: 'Only the trip creator can update this trip.' });
+    }
+    const { destination, startDate, endDate, budget, tripType, description } = req.body;
+    if (!destination || !startDate || !endDate || !budget || !tripType) {
+      return res.status(400).json({ message: 'All fields (destination, startDate, endDate, budget, tripType) are required.' });
+    }
+    trip.destination = destination;
+    trip.startDate = startDate;
+    trip.endDate = endDate;
+    trip.budget = budget;
+    trip.tripType = tripType;
+    trip.description = description;
+    await trip.save();
+    res.status(200).json({ message: 'Trip updated successfully!', trip });
+  } catch (err) {
+    logger.error('Trip update error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

@@ -6,6 +6,7 @@ const links = [
   { to: '/admin/users', label: 'Users' },
   { to: '/admin/kyc', label: 'Pending KYC' },
   { to: '/admin/trips', label: 'Trips' },
+  { to: '/admin/reviews', label: 'Reviews' }, // Added Reviews link
   { to: '/admin/reports', label: 'Reports' },
   { to: '/admin/logs', label: 'Logs' }
 ];

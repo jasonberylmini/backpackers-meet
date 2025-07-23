@@ -20,7 +20,10 @@ const expenseSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+  status: { type: String, enum: ['pending', 'settled'], default: 'pending' },
+  receipt: { type: String },
+  updatedAt: { type: Date, default: Date.now },
+}, { timestamps: true });
 
 const Expense = mongoose.model('Expense', expenseSchema);
 export default Expense;

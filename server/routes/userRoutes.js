@@ -7,9 +7,11 @@ import {
   verifyUser,
   forgotPassword,
   resetPassword,
-  validateResetToken
+  validateResetToken,
+  getUserById
 } from '../controllers/userController.js';
 import upload from '../middlewares/upload.js';
+import verifyToken from '../middlewares/authMiddleware.js';
 import { body } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 
@@ -44,10 +46,13 @@ router.post('/login',
   loginUser
 );
 
-router.post('/update-profile',
+router.put('/profile',
+  verifyToken,
   upload.fields([
     { name: 'idDocument', maxCount: 1 },
-    { name: 'profileImage', maxCount: 1 }
+    { name: 'idSelfie', maxCount: 1 },
+    { name: 'profileImage', maxCount: 1 },
+    { name: 'coverImage', maxCount: 1 }
   ]),
   [
     body('phone').optional().isString(),
@@ -64,5 +69,6 @@ router.post('/validate-reset-token', validateResetToken);
 // ✅ Admin routes
 router.get('/admin/unverified', getUnverifiedUsers);
 router.put('/admin/verify/:id', verifyUser);
+router.get('/:id', getUserById);
 
 export default router;
