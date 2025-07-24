@@ -13,6 +13,7 @@ import chatRoutes from './routes/chatRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import flagRoutes from './routes/flagRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js';
+import postRoutes from './routes/postRoutes.js';
 
 dotenv.config();
 // Environment variable checks
@@ -60,6 +61,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/flags', flagRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/posts', postRoutes);
 
 // Test route
 app.get('/', (req, res) => {
