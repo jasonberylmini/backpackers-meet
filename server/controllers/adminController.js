@@ -9,10 +9,59 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()]
 });
 
+// Get dashboard statistics
+export const getStats = async (req, res) => {
+  try {
+    // Get total counts
+    const totalUsers = await User.countDocuments();
+    const totalTrips = await Trip.countDocuments();
+    const totalReviews = await Review.countDocuments();
+    const totalFlags = await Flag.countDocuments();
+    const totalLogs = await AdminLog.countDocuments();
+    
+    // Get pending KYC count (users with verificationStatus 'pending')
+    const pendingKYC = await User.countDocuments({ verificationStatus: 'pending' });
+    
+    // Get new users today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const newUsersToday = await User.countDocuments({ createdAt: { $gte: today } });
+    
+    // Get new trips today
+    const newTripsToday = await Trip.countDocuments({ createdAt: { $gte: today } });
+    
+    // Get new reviews today
+    const newReviewsToday = await Review.countDocuments({ createdAt: { $gte: today } });
+    
+    // Get new flags today
+    const newFlagsToday = await Flag.countDocuments({ createdAt: { $gte: today } });
+    
+    // Get new admin logs today
+    const newLogsToday = await AdminLog.countDocuments({ timestamp: { $gte: today } });
+
+    res.status(200).json({
+      totalUsers,
+      totalTrips,
+      totalReviews,
+      totalFlags,
+      totalLogs,
+      pendingKYC,
+      newUsersToday,
+      newTripsToday,
+      newReviewsToday,
+      newFlagsToday,
+      newLogsToday
+    });
+  } catch (err) {
+    logger.error("Get Stats Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Get all users
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select('name email role verificationStatus isBanned createdAt gender preferences idDocument');
+    const users = await User.find().select('name email role verificationStatus isBanned createdAt gender preferences idDocument idSelfie');
     res.status(200).json(users);
   } catch (err) {
     logger.error("Get Users Error:", err);
@@ -366,5 +415,120 @@ export const incrementNotificationCount = async (req, res) => {
   } catch (err) {
     logger.error('Increment Notification Count Error:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Admin: Approve a review
+export const approveReview = async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const { adminResponse } = req.body || {};
+    const adminId = req.user.userId;
+
+    const review = await Review.findById(reviewId);
+    if (!review) {
+      return res.status(404).json({ message: "Review not found." });
+    }
+
+    // Update review status
+    review.status = 'approved';
+    review.adminResponse = adminResponse || '';
+    review.updatedAt = new Date();
+    await review.save();
+
+    // Log admin action
+    await AdminLog.create({
+      adminId,
+      action: 'approved review',
+      targetReviewId: reviewId,
+      outcome: 'Review approved and made visible'
+    });
+
+    res.status(200).json({
+      message: "Review approved successfully.",
+      review: {
+        _id: review._id,
+        status: review.status,
+        adminResponse: review.adminResponse,
+        updatedAt: review.updatedAt
+      }
+    });
+  } catch (err) {
+    logger.error("Approve review error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Admin: Reject a review
+export const rejectReview = async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const { adminResponse } = req.body || {};
+    const adminId = req.user.userId;
+
+    const review = await Review.findById(reviewId);
+    if (!review) {
+      return res.status(404).json({ message: "Review not found." });
+    }
+
+    // Update review status
+    review.status = 'rejected';
+    review.adminResponse = adminResponse || '';
+    review.updatedAt = new Date();
+    await review.save();
+
+    // Log admin action
+    await AdminLog.create({
+      adminId,
+      action: 'rejected review',
+      targetReviewId: reviewId,
+      outcome: 'Review rejected and hidden'
+    });
+
+    res.status(200).json({
+      message: "Review rejected successfully.",
+      review: {
+        _id: review._id,
+        status: review.status,
+        adminResponse: review.adminResponse,
+        updatedAt: review.updatedAt
+      }
+    });
+  } catch (err) {
+    logger.error("Reject review error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Admin: Delete a review
+export const deleteReview = async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const adminId = req.user.userId;
+
+    const review = await Review.findById(reviewId);
+    if (!review) {
+      return res.status(404).json({ message: "Review not found." });
+    }
+
+    // Soft delete the review
+    review.deletedAt = new Date();
+    review.updatedAt = new Date();
+    await review.save();
+
+    // Log admin action
+    await AdminLog.create({
+      adminId,
+      action: 'deleted review',
+      targetReviewId: reviewId,
+      outcome: 'Review permanently removed'
+    });
+
+    res.status(200).json({
+      message: "Review deleted successfully."
+    });
+  } catch (err) {
+    logger.error("Delete review error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };

@@ -81,6 +81,7 @@ const userSchema = new mongoose.Schema({
   country: { type: String, default: '' },
   instagram: { type: String, default: '' },
   languages: [{ type: String }],
+  blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 
 });
 

@@ -1,6 +1,7 @@
 import Post from '../models/Post.js';
 import User from '../models/User.js';
 import Comment from '../models/Comment.js';
+import Flag from '../models/Flag.js';
 
 export const createPost = async (req, res) => {
   try {
@@ -208,6 +209,30 @@ export const deleteComment = async (req, res) => {
     await Post.findByIdAndUpdate(comment.post, { $pull: { comments: comment._id } });
     await comment.deleteOne();
     res.status(200).json({ message: 'Comment deleted.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const reportPost = async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { reason } = req.body;
+    if (!reason) return res.status(400).json({ message: 'Reason is required.' });
+    const user = await User.findById(req.user.userId);
+    if (!user || user.verificationStatus !== 'verified') {
+      return res.status(403).json({ message: 'KYC verification required to report.' });
+    }
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: 'Post not found.' });
+    const flag = new Flag({
+      flaggedBy: req.user.userId,
+      flagType: 'post',
+      targetId: postId,
+      reason
+    });
+    await flag.save();
+    res.status(201).json({ message: 'Post reported.', flag });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }

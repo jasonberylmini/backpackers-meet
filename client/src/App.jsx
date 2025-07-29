@@ -5,6 +5,8 @@ import Home from './pages/Home';
 import Register from './pages/Register';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import TripDiscovery from './pages/TripDiscovery';
+import UserProfile from './pages/UserProfile';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
 import AdminKYC from './pages/AdminKYC';
@@ -16,6 +18,7 @@ import logo from '../assets/logo.png';
 import ResetPassword from './pages/ResetPassword';
 import ForgotPassword from './pages/ForgotPassword';
 import AdminReviews from './pages/AdminReviews';
+import RealTimeDemo from './pages/RealTimeDemo';
 
 function AppRoutes() {
   const location = useLocation();
@@ -33,6 +36,7 @@ function AppRoutes() {
           <nav className="navbar-links">
             <Link to="/login">Login</Link>
             <Link to="/register">Sign Up</Link>
+            <Link to="/realtime-demo" style={{ color: '#007bff', fontWeight: '500' }}>🚀 Real-Time Demo</Link>
           </nav>
         </header>
       )}
@@ -42,7 +46,25 @@ function AppRoutes() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        
+        {/* User Routes */}
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/trips/browse" element={
+          <ProtectedRoute>
+            <TripDiscovery />
+          </ProtectedRoute>
+        } />
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <UserProfile />
+          </ProtectedRoute>
+        } />
+        
+        {/* Admin Routes */}
         <Route path="/admin/dashboard" element={
           <ProtectedRoute requiredRole="admin">
             <AdminDashboard />
@@ -78,6 +100,9 @@ function AppRoutes() {
             <AdminReviews />
           </ProtectedRoute>
         } />
+        
+        {/* Demo Route */}
+        <Route path="/realtime-demo" element={<RealTimeDemo />} />
       </Routes>
     </>
   );

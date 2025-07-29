@@ -2,13 +2,29 @@ import express from 'express';
 import {
   getAllUsers,
   toggleBanUser,
-  getAllTrips, getReports, getAdminLogs, deleteTrip, getFlagsForTarget, getAllFlags, getNotificationCount, incrementNotificationCount, dismissFlag, resolveFlag
+  getAllTrips,
+  getReports,
+  getAdminLogs,
+  deleteTrip,
+  getFlagsForTarget,
+  getAllFlags,
+  getNotificationCount,
+  incrementNotificationCount,
+  dismissFlag,
+  resolveFlag,
+  approveReview,
+  rejectReview,
+  deleteReview,
+  getStats
 } from '../controllers/adminController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 import isAdmin from '../middlewares/isAdmin.js';
 import { verifyUser, setUserStatus } from '../controllers/userController.js';
 
 const router = express.Router();
+
+// Dashboard statistics
+router.get('/stats', verifyToken, isAdmin, getStats);
 
 // Basic token auth for now — later you can add role check
 router.get('/users', verifyToken, isAdmin, getAllUsers);
@@ -29,5 +45,10 @@ router.patch('/users/:id/status', verifyToken, isAdmin, setUserStatus);
 router.put('/verify/:id', verifyToken, isAdmin, verifyUser);
 
 router.delete('/trips/:id', verifyToken, isAdmin, deleteTrip);
+
+// Admin Review Moderation
+router.put('/reviews/:reviewId/approve', verifyToken, isAdmin, approveReview);
+router.put('/reviews/:reviewId/reject', verifyToken, isAdmin, rejectReview);
+router.delete('/reviews/:reviewId', verifyToken, isAdmin, deleteReview);
 
 export default router;

@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import toast from 'react-hot-toast';
+import AdminLayout from '../components/AdminLayout';
+import AdminTable from '../components/AdminTable';
+import AdminModal from '../components/AdminModal';
+import '../pages/AdminDashboard.css';
 
 export default function AdminReviews() {
   const [reviews, setReviews] = useState([]);
@@ -40,7 +43,6 @@ export default function AdminReviews() {
 
   useEffect(() => {
     fetchReviews();
-    // eslint-disable-next-line
   }, [page, type, rating, flagged, search]);
 
   // Statistics
@@ -50,149 +52,185 @@ export default function AdminReviews() {
 
   // Actions
   const handleFlag = async (reviewId, flag) => {
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
-    await axios.put(`/api/reviews/${reviewId}/${flag ? 'flag' : 'unflag'}`, {}, { headers });
-    fetchReviews();
-  };
-  const handleDelete = async (reviewId) => {
-    if (!window.confirm('Delete this review?')) return;
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
-    await axios.delete(`/api/reviews/${reviewId}`, { headers });
-    fetchReviews();
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.put(`/api/reviews/${reviewId}/${flag ? 'flag' : 'unflag'}`, {}, { headers });
+      toast.success(flag ? 'Review flagged!' : 'Review unflagged!');
+      fetchReviews();
+    } catch (err) {
+      toast.error('Failed to update review flag status.');
+    }
   };
 
+  const handleDelete = async (reviewId) => {
+    if (!window.confirm('Delete this review?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.delete(`/api/reviews/${reviewId}`, { headers });
+      toast.success('Review deleted!');
+      fetchReviews();
+    } catch (err) {
+      toast.error('Failed to delete review.');
+    }
+  };
+
+  const openReviewModal = (review) => {
+    setModalReview(review);
+    setModalOpen(true);
+  };
+
+  const closeReviewModal = () => {
+    setModalOpen(false);
+    setModalReview(null);
+  };
+
+  const columns = [
+    { key: 'reviewer', label: 'Reviewer', sortable: true, render: r => r.reviewer?.name || 'Unknown' },
+    { key: 'target', label: 'Target', sortable: true, render: r => r.targetUser?.name || r.targetTrip?.destination || 'Unknown' },
+    { key: 'rating', label: 'Rating', sortable: true, render: r => `${r.rating}★` },
+    { key: 'feedback', label: 'Feedback', sortable: false, render: r => r.feedback?.substring(0, 50) + (r.feedback?.length > 50 ? '...' : '') },
+    { key: 'flagged', label: 'Status', sortable: true, render: r => r.flagged ? '🚩 Flagged' : '✅ Active' },
+    { key: 'createdAt', label: 'Date', sortable: true, render: r => new Date(r.createdAt).toLocaleDateString() },
+  ];
+
+  const actions = (review) => (
+    <>
+      <button onClick={() => openReviewModal(review)} style={{ marginRight: 8 }}>View</button>
+      <button 
+        onClick={() => handleFlag(review._id, !review.flagged)} 
+        style={{ 
+          marginRight: 8, 
+          backgroundColor: review.flagged ? '#28a745' : '#ffc107', 
+          color: 'white', 
+          border: 'none', 
+          padding: '4px 8px', 
+          borderRadius: 4 
+        }}
+      >
+        {review.flagged ? 'Unflag' : 'Flag'}
+      </button>
+      <button 
+        onClick={() => handleDelete(review._id)} 
+        style={{ 
+          backgroundColor: '#d32f2f', 
+          color: 'white', 
+          border: 'none', 
+          padding: '4px 8px', 
+          borderRadius: 4 
+        }}
+      >
+        Delete
+      </button>
+    </>
+  );
+
+  const pageCount = Math.ceil(total / limit);
+
   return (
-    <div className="admin-dashboard-root">
-      <Sidebar />
-      <div className="admin-dashboard-main">
-        <Topbar />
-        <main className="admin-dashboard-content">
-          <div className="admin-dashboard-content-card">
-            <h1 className="admin-section-title">Review Moderation</h1>
-            <div style={{ marginBottom: 18, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-              <input type="text" placeholder="Search feedback/tags" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '1px solid #cfd8fc', minWidth: 200 }} />
-              <select value={type} onChange={e => { setType(e.target.value); setPage(1); }} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #cfd8fc' }}>
-                <option value="">All Types</option>
-                <option value="user">User</option>
-                <option value="trip">Trip</option>
-              </select>
-              <select value={rating} onChange={e => { setRating(e.target.value); setPage(1); }} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #cfd8fc' }}>
-                <option value="">All Ratings</option>
-                <option value="5">5★</option>
-                <option value="4">4★</option>
-                <option value="3">3★</option>
-                <option value="2">2★</option>
-                <option value="1">1★</option>
-              </select>
-              <select value={flagged} onChange={e => { setFlagged(e.target.value); setPage(1); }} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #cfd8fc' }}>
-                <option value="">All</option>
-                <option value="true">Flagged</option>
-                <option value="false">Not Flagged</option>
-              </select>
-            </div>
-            <div style={{ marginBottom: 18, fontSize: 15 }}>
-              <b>Total:</b> {total} &nbsp;|&nbsp; <span style={{ color: '#4ade80' }}>+{positive.length}</span> / <span style={{ color: '#ef4444' }}>-{negative.length}</span> &nbsp;|&nbsp; <span style={{ color: '#f59e42' }}>Flagged: {flaggedCount}</span>
-            </div>
-            <div className="admin-dashboard-table-wrapper">
-              {loading ? (
-                <div style={{ textAlign: 'center', color: '#bbb', padding: 40 }}>Loading reviews...</div>
-              ) : error ? (
-                <div className="admin-dashboard-table-error">{error} <button onClick={fetchReviews}>Retry</button></div>
-              ) : (
-                <>
-                  <table className="admin-dashboard-table">
-                    <thead>
-                      <tr>
-                        <th>Type</th>
-                        <th>Reviewer</th>
-                        <th>Reviewee</th>
-                        <th>Rating</th>
-                        <th>Feedback</th>
-                        <th>Tags</th>
-                        <th>Flagged</th>
-                        <th>Date</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reviews.map(r => (
-                        <tr key={r._id} style={r.flagged ? { background: '#fff7e6' } : {}}>
-                          <td>{r.reviewType}</td>
-                          <td>{r.reviewer?.name || 'Unknown'}</td>
-                          <td>{r.reviewType === 'user' ? r.reviewedUser?.name : r.tripId?.destination || 'Unknown'}</td>
-                          <td style={{ color: r.rating >= 4 ? '#4ade80' : r.rating <= 2 ? '#ef4444' : '#888', fontWeight: 600 }}>{r.rating}★</td>
-                          <td>
-                            <span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#4e54c8' }} onClick={() => { setModalReview(r); setModalOpen(true); }}>{r.feedback.slice(0, 40)}{r.feedback.length > 40 ? '...' : ''}</span>
-                          </td>
-                          <td>{r.tags && r.tags.length > 0 ? r.tags.join(', ') : '-'}</td>
-                          <td>{r.flagged ? 'Yes' : 'No'}</td>
-                          <td>{new Date(r.createdAt).toLocaleDateString()}</td>
-                          <td>
-                            <button style={{ fontSize: 12, color: r.flagged ? '#4e54c8' : '#f59e42', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginRight: 8 }} onClick={() => handleFlag(r._id, !r.flagged)}>{r.flagged ? 'Unflag' : 'Flag'}</button>
-                            <button style={{ fontSize: 12, color: '#d32f2f', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => handleDelete(r._id)}>Delete</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {/* Pagination controls */}
-                  {total > limit && (
-                    <div className="admin-dashboard-table-pagination">
-                      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</button>
-                      <span>Page {page} of {Math.ceil(total / limit)}</span>
-                      <button onClick={() => setPage(p => Math.min(Math.ceil(total / limit), p + 1))} disabled={page === Math.ceil(total / limit)}>Next</button>
-                    </div>
-                  )}
-                  {/* Modal for review details */}
-                  {modalOpen && modalReview && (
-                    <div style={{
-                      position: 'fixed',
-                      top: 0,
-                      left: 0,
-                      width: '100vw',
-                      height: '100vh',
-                      background: 'rgba(0,0,0,0.35)',
-                      zIndex: 9999,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <div style={{
-                        background: '#fff',
-                        borderRadius: 12,
-                        maxWidth: 480,
-                        width: '90vw',
-                        maxHeight: '80vh',
-                        overflowY: 'auto',
-                        boxShadow: '0 8px 32px rgba(34,48,91,0.13)',
-                        padding: 28,
-                        position: 'relative',
-                      }}>
-                        <button
-                          onClick={() => setModalOpen(false)}
-                          style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }}
-                          aria-label="Close"
-                        >×</button>
-                        <h2 style={{ marginBottom: 12, color: '#4e54c8', fontSize: 22 }}>Review Details</h2>
-                        <div style={{ marginBottom: 8 }}><b>Type:</b> {modalReview.reviewType}</div>
-                        <div style={{ marginBottom: 8 }}><b>Reviewer:</b> {modalReview.reviewer?.name || 'Unknown'} ({modalReview.reviewer?.email || '-'})</div>
-                        <div style={{ marginBottom: 8 }}><b>Reviewee:</b> {modalReview.reviewType === 'user' ? modalReview.reviewedUser?.name : modalReview.tripId?.destination || 'Unknown'}</div>
-                        <div style={{ marginBottom: 8 }}><b>Rating:</b> <span style={{ color: modalReview.rating >= 4 ? '#4ade80' : modalReview.rating <= 2 ? '#ef4444' : '#888', fontWeight: 600 }}>{modalReview.rating}★</span></div>
-                        <div style={{ marginBottom: 8 }}><b>Feedback:</b> {modalReview.feedback}</div>
-                        <div style={{ marginBottom: 8 }}><b>Tags:</b> {modalReview.tags && modalReview.tags.length > 0 ? modalReview.tags.join(', ') : '-'}</div>
-                        <div style={{ marginBottom: 8 }}><b>Flagged:</b> {modalReview.flagged ? 'Yes' : 'No'}</div>
-                        <div style={{ marginBottom: 8 }}><b>Date:</b> {new Date(modalReview.createdAt).toLocaleString()}</div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
+    <AdminLayout>
+      <h1>Review Moderation</h1>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+        <input 
+          type="text" 
+          placeholder="Search feedback/tags" 
+          value={search} 
+          onChange={e => { setSearch(e.target.value); setPage(1); }} 
+          style={{ padding: 8, borderRadius: 6, border: '1px solid #e1e5e9', minWidth: 200 }}
+        />
+        <select 
+          value={type} 
+          onChange={e => { setType(e.target.value); setPage(1); }} 
+          style={{ padding: 8, borderRadius: 6, border: '1px solid #e1e5e9' }}
+        >
+          <option value="">All Types</option>
+          <option value="user">User</option>
+          <option value="trip">Trip</option>
+        </select>
+        <select 
+          value={rating} 
+          onChange={e => { setRating(e.target.value); setPage(1); }} 
+          style={{ padding: 8, borderRadius: 6, border: '1px solid #e1e5e9' }}
+        >
+          <option value="">All Ratings</option>
+          <option value="5">5★</option>
+          <option value="4">4★</option>
+          <option value="3">3★</option>
+          <option value="2">2★</option>
+          <option value="1">1★</option>
+        </select>
+        <select 
+          value={flagged} 
+          onChange={e => { setFlagged(e.target.value); setPage(1); }} 
+          style={{ padding: 8, borderRadius: 6, border: '1px solid #e1e5e9' }}
+        >
+          <option value="">All</option>
+          <option value="true">Flagged</option>
+          <option value="false">Not Flagged</option>
+        </select>
+      </div>
+      <div style={{ marginBottom: 24, fontSize: 15, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 6 }}>
+        <b>Total:</b> {total} &nbsp;|&nbsp; 
+        <span style={{ color: '#28a745' }}>+{positive.length}</span> / 
+        <span style={{ color: '#d32f2f' }}>-{negative.length}</span> &nbsp;|&nbsp; 
+        <span style={{ color: '#ffc107' }}>🚩 Flagged: {flaggedCount}</span>
+      </div>
+      <AdminTable
+        columns={columns}
+        data={reviews}
+        loading={loading}
+        error={error}
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
+        onSort={() => {}}
+        sortKey={''}
+        sortDirection={'asc'}
+        actions={actions}
+        emptyMessage="No reviews found."
+      />
+      <AdminModal open={modalOpen} onClose={closeReviewModal} title={`Review Details - ${modalReview?.reviewer?.name}`}>
+        {modalReview && (
+          <div>
+            <div><b>Reviewer:</b> {modalReview.reviewer?.name} ({modalReview.reviewer?.email})</div>
+            <div><b>Target:</b> {modalReview.targetUser?.name || modalReview.targetTrip?.destination}</div>
+            <div><b>Rating:</b> {modalReview.rating}★</div>
+            <div><b>Feedback:</b> {modalReview.feedback}</div>
+            {modalReview.tags && modalReview.tags.length > 0 && (
+              <div><b>Tags:</b> {modalReview.tags.join(', ')}</div>
+            )}
+            <div><b>Status:</b> {modalReview.flagged ? '🚩 Flagged' : '✅ Active'}</div>
+            <div><b>Date:</b> {new Date(modalReview.createdAt).toLocaleString()}</div>
+            <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+              <button 
+                onClick={() => handleFlag(modalReview._id, !modalReview.flagged)} 
+                style={{ 
+                  padding: '8px 16px', 
+                  backgroundColor: modalReview.flagged ? '#28a745' : '#ffc107', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: 4 
+                }}
+              >
+                {modalReview.flagged ? 'Unflag Review' : 'Flag Review'}
+              </button>
+              <button 
+                onClick={() => handleDelete(modalReview._id)} 
+                style={{ 
+                  padding: '8px 16px', 
+                  backgroundColor: '#d32f2f', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: 4 
+                }}
+              >
+                Delete Review
+              </button>
             </div>
           </div>
-        </main>
-      </div>
-    </div>
+        )}
+      </AdminModal>
+    </AdminLayout>
   );
 } 

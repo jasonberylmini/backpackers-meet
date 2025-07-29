@@ -184,4 +184,28 @@ export const updateTrip = async (req, res) => {
   }
 };
 
+export const deleteTrip = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const userId = req.user.userId;
+    const trip = await Trip.findById(tripId);
+    if (!trip) {
+      return res.status(404).json({ message: 'Trip not found.' });
+    }
+    if (!trip.creator.equals(userId)) {
+      return res.status(403).json({ message: 'Only the trip creator can delete this trip.' });
+    }
+    // Remove trip from all users' joinedGroups
+    await User.updateMany(
+      { joinedGroups: trip._id },
+      { $pull: { joinedGroups: trip._id } }
+    );
+    await trip.deleteOne();
+    res.status(200).json({ message: 'Trip deleted.' });
+  } catch (err) {
+    logger.error('Trip delete error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 

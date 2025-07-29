@@ -1,255 +1,388 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import toast from 'react-hot-toast';
+import AdminLayout from '../components/AdminLayout';
 import DashboardCard from '../components/DashboardCard';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import { useAdminRealtime } from '../hooks/useAdminRealtime';
 import '../pages/AdminDashboard.css';
 
-function sortData(data, key, direction) {
-  if (!key) return data;
-  // Support nested keys (e.g., 'adminId.name')
-  function getValue(obj, path) {
-    return path.split('.').reduce((o, p) => (o ? o[p] : ''), obj);
-  }
-  return [...data].sort((a, b) => {
-    let aValue = getValue(a, key);
-    let bValue = getValue(b, key);
-    // Special handling for date
-    if (key === 'createdAt' || key === 'timestamp') {
-      aValue = new Date(aValue);
-      bValue = new Date(bValue);
-    }
-    if (aValue < bValue) return direction === 'asc' ? -1 : 1;
-    if (aValue > bValue) return direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-}
-
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({ users: 0, pendingKYC: 0, trips: 0, reports: 0, logs: 0 });
-  const [allUsers, setAllUsers] = useState([]);
-  const [allLogs, setAllLogs] = useState([]);
-  const [admin, setAdmin] = useState(null);
-
-  // Loading and error states
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { isConnected, getSummaryStats, getLiveData } = useAdminRealtime();
 
-  // Sorting and pagination state
-  const [userSort, setUserSort] = useState({ key: 'createdAt', direction: 'desc' });
-  const [userPage, setUserPage] = useState(1);
-  const [logSort, setLogSort] = useState({ key: 'timestamp', direction: 'desc' });
-  const [logPage, setLogPage] = useState(1);
-  const USERS_PER_PAGE = 10;
-  const LOGS_PER_PAGE = 10;
-
-  const fetchData = async () => {
+  const fetchStats = async () => {
     setLoading(true);
     setError(null);
-    const token = localStorage.getItem('token');
-    const user = JSON.parse(localStorage.getItem('user'));
-    setAdmin(user);
-    const headers = { Authorization: `Bearer ${token}` };
     try {
-      const [usersRes, tripsRes, reportsRes, logsRes] = await Promise.all([
-        axios.get('/api/admin/users', { headers }),
-        axios.get('/api/admin/trips', { headers }),
-        axios.get('/api/admin/reports?type=flag', { headers }),
-        axios.get('/api/admin/logs', { headers })
-      ]);
-      setStats({
-        users: usersRes.data.length,
-        pendingKYC: usersRes.data.filter(u => u.verificationStatus === 'pending').length,
-        trips: tripsRes.data.length,
-        reports: reportsRes.data.totalFlags,
-        logs: logsRes.data.length
-      });
-      setAllUsers(usersRes.data);
-      setAllLogs(logsRes.data);
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.get('/api/admin/stats', { headers });
+      setStats(res.data);
       setLoading(false);
     } catch (err) {
-      setError('Failed to load data.');
+      setError('Failed to load dashboard statistics.');
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchStats();
   }, []);
 
-  // Sorting and pagination logic for users
-  const sortedUsers = sortData(allUsers, userSort.key, userSort.direction);
-  const pagedUsers = sortedUsers.slice((userPage - 1) * USERS_PER_PAGE, userPage * USERS_PER_PAGE);
-  const userPageCount = Math.ceil(sortedUsers.length / USERS_PER_PAGE);
+  // Get real-time summary stats
+  const realtimeStats = getSummaryStats();
+  const liveData = getLiveData();
 
-  // Sorting and pagination logic for logs
-  const sortedLogs = sortData(allLogs, logSort.key, logSort.direction);
-  const pagedLogs = sortedLogs.slice((logPage - 1) * LOGS_PER_PAGE, logPage * LOGS_PER_PAGE);
-  const logPageCount = Math.ceil(sortedLogs.length / LOGS_PER_PAGE);
-
-  // Sort handler
-  function handleUserSort(key) {
-    setUserSort(prev => ({
-      key,
-      direction: prev.key === key ? (prev.direction === 'asc' ? 'desc' : 'asc') : 'asc'
-    }));
-    setUserPage(1);
+  if (loading) {
+    return (
+      <AdminLayout>
+        <h1>Admin Dashboard</h1>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 20 }}>
+          {[...Array(6)].map((_, i) => (
+            <div key={i} style={{ height: 120, backgroundColor: '#f8f9fa', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ color: '#666' }}>Loading...</div>
+            </div>
+          ))}
+        </div>
+      </AdminLayout>
+    );
   }
-  function handleLogSort(key) {
-    setLogSort(prev => ({
-      key,
-      direction: prev.key === key ? (prev.direction === 'asc' ? 'desc' : 'asc') : 'asc'
-    }));
-    setLogPage(1);
+
+  if (error) {
+    return (
+      <AdminLayout>
+        <h1>Admin Dashboard</h1>
+        <div style={{ color: '#d32f2f', padding: 20, textAlign: 'center' }}>
+          {error} <button onClick={fetchStats}>Retry</button>
+        </div>
+      </AdminLayout>
+    );
   }
 
   return (
-    <div className="admin-dashboard-root">
-      <Sidebar />
-      <div className="admin-dashboard-main">
-        <Topbar admin={admin} />
-        <main className="admin-dashboard-content">
-          <div className="admin-dashboard-content-card">
-            <div className="admin-users-header-row">
-              <div className="admin-logged-in-as">Logged in as Admin: <span>{admin?.name}</span></div>
-              <h1 className="admin-section-title">Dashboard</h1>
-            </div>
-            <div className="admin-dashboard-cards">
-              <DashboardCard title="Total Users" value={stats.users} icon="👤" loading={loading} error={error} />
-              <DashboardCard title="Pending KYC" value={stats.pendingKYC} icon="🕒" loading={loading} error={error} />
-              <DashboardCard title="Total Trips" value={stats.trips} icon="🧳" loading={loading} error={error} />
-              <DashboardCard title="Reports" value={stats.reports} icon="📄" loading={loading} error={error} />
-              <DashboardCard title="Admin Logs" value={stats.logs} icon="📝" loading={loading} error={error} />
-            </div>
-            <div className="admin-dashboard-tables">
-              <section className="admin-dashboard-table-section">
-                <h3 className="admin-dashboard-table-title">Recent User Signups</h3>
-                <div className="admin-dashboard-table-wrapper">
-                  {loading ? (
-                    <table className="admin-dashboard-table">
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Email</th>
-                          <th>Role</th>
-                          <th>Status</th>
-                          <th>Joined</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...Array(5)].map((_, i) => (
-                          <tr key={i} className="admin-dashboard-table-skeleton-row">
-                            <td colSpan={5}><span className="admin-dashboard-table-skeleton" /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : error ? (
-                    <div className="admin-dashboard-table-error">
-                      {error} <button onClick={fetchData}>Retry</button>
-                    </div>
-                  ) : (
-                    <>
-                      <table className="admin-dashboard-table">
-                        <thead>
-                          <tr>
-                            <th onClick={() => handleUserSort('name')} tabIndex={0} className={userSort.key === 'name' ? `sorted-${userSort.direction}` : ''}>Name</th>
-                            <th onClick={() => handleUserSort('email')} tabIndex={0} className={userSort.key === 'email' ? `sorted-${userSort.direction}` : ''}>Email</th>
-                            <th onClick={() => handleUserSort('role')} tabIndex={0} className={userSort.key === 'role' ? `sorted-${userSort.direction}` : ''}>Role</th>
-                            <th onClick={() => handleUserSort('verificationStatus')} tabIndex={0} className={userSort.key === 'verificationStatus' ? `sorted-${userSort.direction}` : ''}>Status</th>
-                            <th onClick={() => handleUserSort('createdAt')} tabIndex={0} className={userSort.key === 'createdAt' ? `sorted-${userSort.direction}` : ''}>Joined</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pagedUsers.map(u => (
-                            <tr key={u._id} tabIndex={0}>
-                              <td>{u.name}</td>
-                              <td>{u.email}</td>
-                              <td>{u.role}</td>
-                              <td>{u.verificationStatus}</td>
-                              <td>{new Date(u.createdAt).toLocaleDateString()}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {/* Pagination controls */}
-                      {userPageCount > 1 && (
-                        <div className="admin-dashboard-table-pagination">
-                          <button onClick={() => setUserPage(p => Math.max(1, p - 1))} disabled={userPage === 1}>Prev</button>
-                          <span>Page {userPage} of {userPageCount}</span>
-                          <button onClick={() => setUserPage(p => Math.min(userPageCount, p + 1))} disabled={userPage === userPageCount}>Next</button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </section>
-              <section className="admin-dashboard-table-section">
-                <h3 className="admin-dashboard-table-title">Recent Admin Logs</h3>
-                <div className="admin-dashboard-table-wrapper">
-                  {loading ? (
-                    <table className="admin-dashboard-table">
-                      <thead>
-                        <tr>
-                          <th>Admin</th>
-                          <th>Action</th>
-                          <th>User</th>
-                          <th>Reason</th>
-                          <th>Time</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...Array(5)].map((_, i) => (
-                          <tr key={i} className="admin-dashboard-table-skeleton-row">
-                            <td colSpan={5}><span className="admin-dashboard-table-skeleton" /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : error ? (
-                    <div className="admin-dashboard-table-error">
-                      {error} <button onClick={fetchData}>Retry</button>
-                    </div>
-                  ) : (
-                    <>
-                      <table className="admin-dashboard-table">
-                        <thead>
-                          <tr>
-                            <th onClick={() => handleLogSort('adminId.name')} tabIndex={0} className={logSort.key === 'adminId.name' ? `sorted-${logSort.direction}` : ''}>Admin</th>
-                            <th onClick={() => handleLogSort('action')} tabIndex={0} className={logSort.key === 'action' ? `sorted-${logSort.direction}` : ''}>Action</th>
-                            <th onClick={() => handleLogSort('targetUserId.email')} tabIndex={0} className={logSort.key === 'targetUserId.email' ? `sorted-${logSort.direction}` : ''}>User</th>
-                            <th onClick={() => handleLogSort('reason')} tabIndex={0} className={logSort.key === 'reason' ? `sorted-${logSort.direction}` : ''}>Reason</th>
-                            <th onClick={() => handleLogSort('timestamp')} tabIndex={0} className={logSort.key === 'timestamp' ? `sorted-${logSort.direction}` : ''}>Time</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pagedLogs.map(log => (
-                            <tr key={log._id} tabIndex={0}>
-                              <td>{log.adminId?.name}</td>
-                              <td>{log.action}</td>
-                              <td>{log.targetUserId?.email}</td>
-                              <td>{log.reason}</td>
-                              <td>{new Date(log.timestamp).toLocaleString()}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {/* Pagination controls */}
-                      {logPageCount > 1 && (
-                        <div className="admin-dashboard-table-pagination">
-                          <button onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logPage === 1}>Prev</button>
-                          <span>Page {logPage} of {logPageCount}</span>
-                          <button onClick={() => setLogPage(p => Math.min(logPageCount, p + 1))} disabled={logPage === logPageCount}>Next</button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </section>
-            </div>
-          </div>
-        </main>
+    <AdminLayout>
+      <h1>Admin Dashboard</h1>
+      
+      {/* Connection Status */}
+      <div style={{ 
+        marginBottom: 24, 
+        padding: 12, 
+        backgroundColor: isConnected ? '#e8f5e8' : '#fde2e1', 
+        borderRadius: 6,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8
+      }}>
+        <div style={{
+          width: 8, height: 8, borderRadius: '50%', 
+          backgroundColor: isConnected ? '#28a745' : '#dc3545'
+        }} />
+        <span style={{ fontSize: 14, color: isConnected ? '#28a745' : '#dc3545' }}>
+          {isConnected ? '🟢 Real-time updates active' : '🔴 Real-time updates disconnected'}
+        </span>
       </div>
-    </div>
+
+      {/* Main Statistics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 20, marginBottom: 32 }}>
+        <DashboardCard
+          title="Total Users"
+          value={stats?.totalUsers || 0}
+          icon="👥"
+          color="#1976d2"
+          trend={stats?.newUsersToday || 0}
+          trendLabel="new today"
+        />
+        <DashboardCard
+          title="Total Trips"
+          value={stats?.totalTrips || 0}
+          icon="🧳"
+          color="#388e3c"
+          trend={liveData.trips?.length || 0}
+          trendLabel="new live"
+          trendColor="#ff9800"
+        />
+        <DashboardCard
+          title="Active Reviews"
+          value={stats?.totalReviews || 0}
+          icon="⭐"
+          color="#f57c00"
+          trend={liveData.reviews?.length || 0}
+          trendLabel="new live"
+          trendColor="#ff9800"
+        />
+        <DashboardCard
+          title="Pending KYC"
+          value={stats?.pendingKYC || 0}
+          icon="📋"
+          color="#7b1fa2"
+          trend={liveData.kyc?.length || 0}
+          trendLabel="new requests"
+          trendColor="#dc3545"
+        />
+        <DashboardCard
+          title="Flagged Content"
+          value={stats?.totalFlags || 0}
+          icon="🚩"
+          color="#d32f2f"
+          trend={liveData.flags?.length || 0}
+          trendLabel="new flags"
+          trendColor="#dc3545"
+        />
+        <DashboardCard
+          title="Admin Actions"
+          value={stats?.totalLogs || 0}
+          icon="📝"
+          color="#666"
+          trend={liveData.logs?.length || 0}
+          trendLabel="new logs"
+          trendColor="#ff9800"
+        />
+      </div>
+
+      {/* Admin Dashboard Overview */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ marginBottom: 24, color: '#4e54c8', fontSize: '1.8rem' }}>Admin Dashboard Overview</h2>
+        <div style={{ 
+          backgroundColor: '#fff', 
+          borderRadius: 12, 
+          border: '1px solid #e1e5e9',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          padding: '24px'
+        }}>
+              {/* Reorganized Admin Guide */}
+              <div style={{ 
+                padding: 0,
+                backgroundColor: 'transparent'
+              }}>
+                
+                {/* Today's Activity Summary - First */}
+                <div style={{ 
+                  padding: 20, 
+                  backgroundColor: '#f3e5f5', 
+                  borderRadius: 12,
+                  border: '2px solid #ce93d8',
+                  marginBottom: 20,
+                  boxShadow: '0 2px 8px rgba(123, 31, 162, 0.1)'
+                }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#7b1fa2', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    📊 Today's Activity Summary
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+                    <div style={{ textAlign: 'center', padding: 12, backgroundColor: '#fff', borderRadius: 8, border: '1px solid #ce93d8' }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#1976d2' }}>{stats?.newUsersToday || 0}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>New Users</div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: 12, backgroundColor: '#fff', borderRadius: 8, border: '1px solid #ce93d8' }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#388e3c' }}>{stats?.newTripsToday || 0}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>New Trips</div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: 12, backgroundColor: '#fff', borderRadius: 8, border: '1px solid #ce93d8' }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#f57c00' }}>{stats?.newReviewsToday || 0}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>New Reviews</div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: 12, backgroundColor: '#fff', borderRadius: 8, border: '1px solid #ce93d8' }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#d32f2f' }}>{stats?.newFlagsToday || 0}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>New Flags</div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: 12, backgroundColor: '#fff', borderRadius: 8, border: '1px solid #ce93d8' }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#666' }}>{stats?.newLogsToday || 0}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>Admin Actions</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Priority Actions - Second */}
+                <div style={{ 
+                  padding: 24, 
+                  backgroundColor: '#fff3e0', 
+                  borderRadius: 12,
+                  border: '2px solid #ffcc02',
+                  marginBottom: 20,
+                  boxShadow: '0 2px 8px rgba(255, 204, 2, 0.2)'
+                }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#f57c00', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    ⚡ Priority Actions - Start Here
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+                    <div style={{ 
+                      padding: 12, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #ffcc02'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#d32f2f' }}>🚨 Urgent</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: '#d32f2f' }}>{stats?.pendingKYC || 0}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>KYC Reviews Pending</div>
+                    </div>
+                    <div style={{ 
+                      padding: 12, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #ffcc02'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#d32f2f' }}>🚩 Attention</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: '#d32f2f' }}>{stats?.totalFlags || 0}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>Flagged Items</div>
+                    </div>
+                    <div style={{ 
+                      padding: 12, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #ffcc02'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1976d2' }}>👥 New</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: '#1976d2' }}>{stats?.newUsersToday || 0}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>Users Today</div>
+                    </div>
+                    <div style={{ 
+                      padding: 12, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #ffcc02'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: isConnected ? '#28a745' : '#dc3545' }}>🔗 Status</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: isConnected ? '#28a745' : '#dc3545' }}>
+                        {isConnected ? '🟢 Online' : '🔴 Offline'}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#666' }}>System Status</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Navigation Guide - Third */}
+                <div style={{ 
+                  padding: 24, 
+                  backgroundColor: '#e3f2fd', 
+                  borderRadius: 12,
+                  border: '2px solid #bbdefb',
+                  marginBottom: 20,
+                  boxShadow: '0 2px 8px rgba(25, 118, 210, 0.1)'
+                }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#1976d2', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    🧭 Navigation Guide - Where to Go
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+                    <div style={{ 
+                      padding: 16, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #bbdefb'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1976d2', marginBottom: 8 }}>👥 Users</div>
+                      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
+                        Manage accounts, view profiles, ban/unban users, monitor activity
+                      </div>
+                    </div>
+                    <div style={{ 
+                      padding: 16, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #bbdefb'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#7b1fa2', marginBottom: 8 }}>📋 Pending KYC</div>
+                      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
+                        Review identity documents, verify users, approve/reject applications
+                      </div>
+                    </div>
+                    <div style={{ 
+                      padding: 16, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #bbdefb'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#388e3c', marginBottom: 8 }}>🧳 Trips</div>
+                      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
+                        Monitor trip creation, manage bookings, view trip details
+                      </div>
+                    </div>
+                    <div style={{ 
+                      padding: 16, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #bbdefb'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#f57c00', marginBottom: 8 }}>⭐ Reviews</div>
+                      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
+                        Moderate user reviews, manage ratings, handle complaints
+                      </div>
+                    </div>
+                    <div style={{ 
+                      padding: 16, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #bbdefb'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#d32f2f', marginBottom: 8 }}>🚩 Reports</div>
+                      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
+                        View flagged content, handle user reports, investigate issues
+                      </div>
+                    </div>
+                    <div style={{ 
+                      padding: 16, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #bbdefb'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#666', marginBottom: 8 }}>📝 Logs</div>
+                      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
+                        Track admin actions, view system events, audit trails
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Best Practices - Fourth */}
+                <div style={{ 
+                  padding: 24, 
+                  backgroundColor: '#e8f5e8', 
+                  borderRadius: 12,
+                  border: '2px solid #a5d6a7',
+                  boxShadow: '0 2px 8px rgba(56, 142, 60, 0.1)'
+                }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#388e3c', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    📋 Best Practices - Do This Daily
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
+                    <div style={{ 
+                      padding: 16, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #a5d6a7'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#d32f2f', marginBottom: 8 }}>⏰ Within 24 Hours</div>
+                      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
+                        Review KYC documents, respond to urgent flags, handle critical reports
+                      </div>
+                    </div>
+                    <div style={{ 
+                      padding: 16, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #a5d6a7'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#f57c00', marginBottom: 8 }}>📅 Daily Tasks</div>
+                      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
+                        Check flagged content, monitor user reports, review new registrations
+                      </div>
+                    </div>
+                    <div style={{ 
+                      padding: 16, 
+                      backgroundColor: '#fff', 
+                      borderRadius: 8,
+                      border: '1px solid #a5d6a7'
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1976d2', marginBottom: 8 }}>📊 Weekly Review</div>
+                      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
+                        Review admin logs, analyze trends, update moderation policies
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+        </div>
+      </div>
+    </AdminLayout>
   );
 } 

@@ -287,3 +287,127 @@ export const getUserById = async (req, res) => {
   }
 };
 
+export const blockUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user.userId;
+    
+    // Prevent self-blocking
+    if (currentUserId === userId) {
+      return res.status(400).json({ message: 'You cannot block yourself.' });
+    }
+    
+    // Check if target user exists
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User to block not found.' });
+    }
+    
+    // Check if already blocked
+    const currentUser = await User.findById(currentUserId);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'Current user not found.' });
+    }
+    
+    if (currentUser.blockedUsers && currentUser.blockedUsers.includes(userId)) {
+      return res.status(400).json({ message: 'User already blocked.' });
+    }
+    
+    // Add user to blocked list
+    await User.findByIdAndUpdate(currentUserId, { 
+      $addToSet: { blockedUsers: userId },
+      updatedAt: new Date()
+    });
+    
+    // Log the action
+    await AdminLog.create({
+      adminId: currentUserId,
+      action: 'blocked user',
+      targetUserId: userId,
+      outcome: `User ${currentUser.name} blocked ${targetUser.name}`
+    });
+    
+    res.status(200).json({ 
+      message: 'User blocked successfully.',
+      blockedUser: {
+        _id: targetUser._id,
+        name: targetUser.name,
+        email: targetUser.email
+      }
+    });
+  } catch (err) {
+    logger.error('Block User Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Unblock a user
+export const unblockUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user.userId;
+    
+    // Check if target user exists
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User to unblock not found.' });
+    }
+    
+    // Check if user is actually blocked
+    const currentUser = await User.findById(currentUserId);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'Current user not found.' });
+    }
+    
+    if (!currentUser.blockedUsers || !currentUser.blockedUsers.includes(userId)) {
+      return res.status(400).json({ message: 'User is not blocked.' });
+    }
+    
+    // Remove user from blocked list
+    await User.findByIdAndUpdate(currentUserId, { 
+      $pull: { blockedUsers: userId },
+      updatedAt: new Date()
+    });
+    
+    // Log the action
+    await AdminLog.create({
+      adminId: currentUserId,
+      action: 'unblocked user',
+      targetUserId: userId,
+      outcome: `User ${currentUser.name} unblocked ${targetUser.name}`
+    });
+    
+    res.status(200).json({ 
+      message: 'User unblocked successfully.',
+      unblockedUser: {
+        _id: targetUser._id,
+        name: targetUser.name,
+        email: targetUser.email
+      }
+    });
+  } catch (err) {
+    logger.error('Unblock User Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get blocked users list
+export const getBlockedUsers = async (req, res) => {
+  try {
+    const currentUserId = req.user.userId;
+    
+    const currentUser = await User.findById(currentUserId).populate('blockedUsers', 'name email profileImage');
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+    
+    res.status(200).json({ 
+      blockedUsers: currentUser.blockedUsers || [],
+      count: currentUser.blockedUsers ? currentUser.blockedUsers.length : 0
+    });
+  } catch (err) {
+    logger.error('Get Blocked Users Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+

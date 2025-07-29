@@ -11,6 +11,7 @@
   min-height: 100vh;
   background: none;
   align-items: stretch;
+  margin-left: 220px;
 }
 .admin-dashboard-content {
   flex: 1;
@@ -244,6 +245,12 @@
   max-width: 260px;
   border-top-left-radius: 1.5rem;
   border-bottom-left-radius: 1.5rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  overflow-y: auto;
+  z-index: 1000;
 }
 .admin-sidebar-title {
   font-size: 2rem;
@@ -345,7 +352,7 @@
 /* Responsive tweaks */
 @media (max-width: 900px) {
   .admin-dashboard-main {
-    padding-left: 0;
+    margin-left: 0;
   }
   .admin-sidebar {
     min-width: 60px;
