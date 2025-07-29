@@ -9,11 +9,8 @@ export default function Topbar() {
   const totalNotifications = getNotificationCount();
 
   return (
-    <header className="admin-topbar" style={{
-      width: '100%', background: '#fff', borderBottom: '1px solid #e1e5e9', padding: '0.75rem 2rem',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 56, zIndex: 10
-    }}>
-      <div></div>
+    <header className="admin-topbar">
+      <div style={{ flex: 1 }}></div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
         {/* Connection Status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -112,34 +109,21 @@ export default function Topbar() {
                     <div key={index} style={{
                       padding: '12px 16px',
                       borderBottom: '1px solid #f0f0f0',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s'
-                    }} onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'} onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: '#333', marginBottom: 4 }}>
-                        {notification.title || 'Admin Notification'}
+                      fontSize: 14
+                    }}>
+                      <div style={{ fontWeight: 500, color: '#333', marginBottom: 4 }}>
+                        {notification.title}
                       </div>
-                      <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                      <div style={{ color: '#666', fontSize: 12 }}>
                         {notification.message}
                       </div>
-                      <div style={{ fontSize: 11, color: '#999' }}>
-                        {new Date(notification.timestamp || Date.now()).toLocaleTimeString()}
+                      <div style={{ color: '#999', fontSize: 11, marginTop: 4 }}>
+                        {new Date(notification.timestamp).toLocaleString()}
                       </div>
                     </div>
                   ))
                 )}
               </div>
-
-              {adminNotifications.length > 10 && (
-                <div style={{
-                  padding: '8px 16px',
-                  textAlign: 'center',
-                  fontSize: 12,
-                  color: '#666',
-                  borderTop: '1px solid #e1e5e9'
-                }}>
-                  +{adminNotifications.length - 10} more notifications
-                </div>
-              )}
             </div>
           )}
         </div>

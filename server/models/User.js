@@ -28,6 +28,12 @@ const userSchema = new mongoose.Schema({
     default: 'traveler'
   },
 
+  status: {
+    type: String,
+    enum: ['active', 'banned', 'suspended'],
+    default: 'active'
+  },
+
   isBanned: {
     type: Boolean,
     default: false
@@ -54,7 +60,15 @@ const userSchema = new mongoose.Schema({
   coverImage: { type: String, default: '' },
 
   moderation: {
-    notificationCount: { type: Number, default: 0 }
+    notificationCount: { type: Number, default: 0 },
+    reported: { type: Boolean, default: false },
+    reportedAt: { type: Date },
+    reportReason: { type: String },
+    bannedAt: { type: Date },
+    unbannedAt: { type: Date },
+    warnedAt: { type: Date },
+    warningCount: { type: Number, default: 0 },
+    warningReason: { type: String }
   },
 
   // For password reset

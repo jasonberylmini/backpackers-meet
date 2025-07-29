@@ -58,11 +58,44 @@ export const getStats = async (req, res) => {
   }
 };
 
-// Get all users
+// Get all users with enhanced data
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select('name email role verificationStatus isBanned createdAt gender preferences idDocument idSelfie');
-    res.status(200).json(users);
+    const users = await User.find().select('name email role verificationStatus isBanned createdAt gender preferences idDocument idSelfie phone location lastLogin');
+    
+    // Enhance users with activity data
+    const enhancedUsers = await Promise.all(users.map(async (user) => {
+      // Get user's trip count
+      const tripsCount = await Trip.countDocuments({ createdBy: user._id });
+      
+      // Get user's review count
+      const reviewsCount = await Review.countDocuments({ userId: user._id });
+      
+      // Get flags against this user's content
+      const flagsCount = await Flag.countDocuments({ 
+        $or: [
+          { targetId: user._id, flagType: 'user' },
+          { targetId: { $in: await Trip.find({ createdBy: user._id }).select('_id') } },
+          { targetId: { $in: await Review.find({ userId: user._id }).select('_id') } }
+        ]
+      });
+      
+      // Get reports received by this user
+      const reportsCount = await Flag.countDocuments({ 
+        targetId: user._id, 
+        flagType: 'user' 
+      });
+
+      return {
+        ...user.toObject(),
+        tripsCount,
+        reviewsCount,
+        flagsCount,
+        reportsCount
+      };
+    }));
+
+    res.status(200).json(enhancedUsers);
   } catch (err) {
     logger.error("Get Users Error:", err);
     res.status(500).json({ message: "Server error" });
@@ -94,6 +127,711 @@ export const toggleBanUser = async (req, res) => {
     });
   } catch (err) {
     logger.error("Ban error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Bulk ban/unban users
+export const bulkToggleBanUsers = async (req, res) => {
+  try {
+    const { userIds, isBanned } = req.body;
+    
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ message: "User IDs array is required." });
+    }
+
+    const updatedUsers = await User.updateMany(
+      { _id: { $in: userIds } },
+      { isBanned },
+      { new: true }
+    );
+
+    // Log bulk action
+    await AdminLog.create({
+      adminId: req.user.userId,
+      action: isBanned ? 'bulk banned users' : 'bulk unbanned users',
+      targetUserIds: userIds,
+      reason: isBanned ? 'Bulk violation or flagged behavior' : 'Bulk manual review cleared'
+    });
+
+    res.status(200).json({
+      message: isBanned ? `${userIds.length} users banned.` : `${userIds.length} users unbanned.`,
+      updatedCount: userIds.length
+    });
+  } catch (err) {
+    logger.error("Bulk ban error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Bulk KYC verification
+export const bulkKYCVerification = async (req, res) => {
+  try {
+    const { userIds, verificationStatus } = req.body;
+    
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ message: "User IDs array is required." });
+    }
+
+    if (!['verified', 'rejected'].includes(verificationStatus)) {
+      return res.status(400).json({ message: "Invalid verification status." });
+    }
+
+    const updatedUsers = await User.updateMany(
+      { _id: { $in: userIds } },
+      { verificationStatus },
+      { new: true }
+    );
+
+    // Log bulk KYC action
+    await AdminLog.create({
+      adminId: req.user.userId,
+      action: `bulk ${verificationStatus} KYC`,
+      targetUserIds: userIds,
+      reason: `Bulk KYC ${verificationStatus} - Manual review`
+    });
+
+    res.status(200).json({
+      message: `${userIds.length} users ${verificationStatus}.`,
+      updatedCount: userIds.length
+    });
+  } catch (err) {
+    logger.error("Bulk KYC error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+// Get trip statistics
+export const getTripStats = async (req, res) => {
+  try {
+    const totalTrips = await Trip.countDocuments();
+    const activeTrips = await Trip.countDocuments({ status: 'active' });
+    const completedTrips = await Trip.countDocuments({ status: 'completed' });
+    const cancelledTrips = await Trip.countDocuments({ status: 'cancelled' });
+    const reportedTrips = await Trip.countDocuments({ 'moderation.reported': true });
+    
+    // Trips today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tripsToday = await Trip.countDocuments({ createdAt: { $gte: today } });
+    
+    // Average budget
+    const avgBudget = await Trip.aggregate([
+      { $group: { _id: null, avgBudget: { $avg: '$budget' } } }
+    ]);
+    
+    // Popular destinations
+    const popularDestinations = await Trip.aggregate([
+      { $group: { _id: '$destination', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 }
+    ]);
+    
+    // Trip type distribution
+    const tripTypeStats = await Trip.aggregate([
+      { $group: { _id: '$tripType', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+    
+    // Recent trips
+    const recentTrips = await Trip.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('creator', 'name email')
+      .select('destination startDate endDate budget creator');
+
+    res.status(200).json({
+      totalTrips,
+      activeTrips,
+      completedTrips,
+      cancelledTrips,
+      reportedTrips,
+      tripsToday,
+      avgBudget: avgBudget[0]?.avgBudget || 0,
+      popularDestinations,
+      tripTypeStats,
+      recentTrips
+    });
+  } catch (err) {
+    logger.error("Get trip stats error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get reported trips
+export const getReportedTrips = async (req, res) => {
+  try {
+    const { status, search, page = 1, limit = 20 } = req.query;
+    const filter = { 'moderation.reported': true };
+    
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { destination: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const skip = (Number(page) - 1) * Number(limit);
+    const trips = await Trip.find(filter)
+      .populate('creator', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+    
+    const total = await Trip.countDocuments(filter);
+    
+    res.status(200).json({ trips, total });
+  } catch (err) {
+    logger.error("Get reported trips error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Bulk trip operations
+export const bulkTripOperations = async (req, res) => {
+  try {
+    const { tripIds, action } = req.body;
+    
+    if (!tripIds || !Array.isArray(tripIds) || tripIds.length === 0) {
+      return res.status(400).json({ message: "Trip IDs array is required." });
+    }
+
+    if (!['approve', 'suspend', 'delete', 'complete'].includes(action)) {
+      return res.status(400).json({ message: "Invalid action." });
+    }
+
+    let updateData = {};
+    if (action === 'approve') {
+      updateData = { 
+        status: 'active',
+        'moderation.reported': false,
+        'moderation.approvedAt': new Date()
+      };
+    } else if (action === 'suspend') {
+      updateData = { 
+        status: 'suspended',
+        'moderation.suspendedAt': new Date()
+      };
+    } else if (action === 'complete') {
+      updateData = { 
+        status: 'completed',
+        'moderation.completedAt': new Date()
+      };
+    }
+
+    let result;
+    if (action === 'delete') {
+      result = await Trip.deleteMany({ _id: { $in: tripIds } });
+    } else {
+      result = await Trip.updateMany(
+        { _id: { $in: tripIds } },
+        updateData,
+        { new: true }
+      );
+    }
+
+    // Log bulk trip action
+    await AdminLog.create({
+      adminId: req.user.userId,
+      action: `bulk ${action} trips`,
+      targetTripIds: tripIds,
+      reason: `Bulk trip ${action} - Admin action`
+    });
+
+    res.status(200).json({
+      message: `${tripIds.length} trips ${action}ed.`,
+      updatedCount: tripIds.length
+    });
+  } catch (err) {
+    logger.error("Bulk trip operations error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get flag statistics
+export const getFlagStats = async (req, res) => {
+  try {
+    const totalFlags = await Flag.countDocuments();
+    const pendingFlags = await Flag.countDocuments({ resolved: false, dismissed: false });
+    const resolvedFlags = await Flag.countDocuments({ resolved: true });
+    const dismissedFlags = await Flag.countDocuments({ dismissed: true });
+    const escalatedFlags = await Flag.countDocuments({ escalated: true });
+    
+    // Flags today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const flagsToday = await Flag.countDocuments({ createdAt: { $gte: today } });
+    
+    // High priority flags
+    const highPriorityFlags = await Flag.countDocuments({ severity: 'high' });
+    
+    // Average resolution time (in hours)
+    const resolvedFlagsWithTime = await Flag.find({ 
+      resolved: true, 
+      resolvedAt: { $exists: true } 
+    });
+    
+    let avgResolutionTime = 0;
+    if (resolvedFlagsWithTime.length > 0) {
+      const totalTime = resolvedFlagsWithTime.reduce((sum, flag) => {
+        const resolutionTime = flag.resolvedAt - flag.createdAt;
+        return sum + (resolutionTime / (1000 * 60 * 60)); // Convert to hours
+      }, 0);
+      avgResolutionTime = Math.round(totalTime / resolvedFlagsWithTime.length);
+    }
+    
+    // Flag type distribution
+    const typeStats = await Flag.aggregate([
+      {
+        $group: {
+          _id: '$flagType',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Severity distribution
+    const severityStats = await Flag.aggregate([
+      {
+        $group: {
+          _id: '$severity',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      totalFlags,
+      pendingFlags,
+      resolvedFlags,
+      dismissedFlags,
+      escalatedFlags,
+      flagsToday,
+      highPriorityFlags,
+      avgResolutionTime,
+      typeDistribution: typeStats,
+      severityDistribution: severityStats
+    });
+  } catch (err) {
+    logger.error("Get flag stats error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get user statistics
+export const getUserStats = async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ status: 'active' });
+    const bannedUsers = await User.countDocuments({ status: 'banned' });
+    const reportedUsers = await User.countDocuments({ 'moderation.reported': true });
+    
+    // New users today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const newUsersToday = await User.countDocuments({ createdAt: { $gte: today } });
+    
+    // New users this week
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const newUsersThisWeek = await User.countDocuments({ createdAt: { $gte: weekAgo } });
+    
+    // Most active users (by trip count)
+    const mostActiveUsers = await User.aggregate([
+      {
+        $lookup: {
+          from: 'trips',
+          localField: '_id',
+          foreignField: 'creator',
+          as: 'trips'
+        }
+      },
+      {
+        $addFields: {
+          tripCount: { $size: '$trips' }
+        }
+      },
+      {
+        $sort: { tripCount: -1 }
+      },
+      {
+        $limit: 5
+      },
+      {
+        $project: {
+          name: 1,
+          email: 1,
+          tripCount: 1,
+          createdAt: 1
+        }
+      }
+    ]);
+    
+    // User verification status
+    const verificationStats = await User.aggregate([
+      {
+        $group: {
+          _id: '$verificationStatus',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Recent signups
+    const recentSignups = await User.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('name email createdAt verificationStatus');
+
+    res.status(200).json({
+      totalUsers,
+      activeUsers,
+      bannedUsers,
+      reportedUsers,
+      newUsersToday,
+      newUsersThisWeek,
+      mostActiveUsers,
+      verificationStats,
+      recentSignups
+    });
+  } catch (err) {
+    logger.error("Get user stats error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get reported users
+export const getReportedUsers = async (req, res) => {
+  try {
+    const { status, search, page = 1, limit = 20 } = req.query;
+    const filter = { 'moderation.reported': true };
+    
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const skip = (Number(page) - 1) * Number(limit);
+    const users = await User.find(filter)
+      .select('-passwordHash')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+    
+    const total = await User.countDocuments(filter);
+    
+    res.status(200).json({ users, total });
+  } catch (err) {
+    logger.error("Get reported users error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Bulk user operations
+export const bulkUserOperations = async (req, res) => {
+  try {
+    const { userIds, action } = req.body;
+    
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ message: "User IDs array is required." });
+    }
+
+    if (!['ban', 'unban', 'warn', 'delete'].includes(action)) {
+      return res.status(400).json({ message: "Invalid action." });
+    }
+
+    let updateData = {};
+    if (action === 'ban') {
+      updateData = { 
+        status: 'banned',
+        'moderation.bannedAt': new Date()
+      };
+    } else if (action === 'unban') {
+      updateData = { 
+        status: 'active',
+        'moderation.unbannedAt': new Date()
+      };
+    } else if (action === 'warn') {
+      updateData = { 
+        'moderation.warnedAt': new Date(),
+        'moderation.warningCount': { $inc: 1 }
+      };
+    }
+
+    let result;
+    if (action === 'delete') {
+      result = await User.deleteMany({ _id: { $in: userIds } });
+    } else {
+      result = await User.updateMany(
+        { _id: { $in: userIds } },
+        updateData,
+        { new: true }
+      );
+    }
+
+    // Log bulk user action
+    await AdminLog.create({
+      adminId: req.user.userId,
+      action: `bulk ${action} users`,
+      targetUserIds: userIds,
+      reason: `Bulk user ${action} - Admin action`
+    });
+
+    res.status(200).json({
+      message: `${userIds.length} users ${action}ed.`,
+      updatedCount: userIds.length
+    });
+  } catch (err) {
+    logger.error("Bulk user operations error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get enhanced review statistics
+export const getReviewStats = async (req, res) => {
+  try {
+    const totalReviews = await Review.countDocuments();
+    const pendingReviews = await Review.countDocuments({ status: 'pending' });
+    const approvedReviews = await Review.countDocuments({ status: 'approved' });
+    const rejectedReviews = await Review.countDocuments({ status: 'rejected' });
+    const flaggedReviews = await Review.countDocuments({ flagged: true });
+    
+    // Rating distribution
+    const ratingStats = await Review.aggregate([
+      {
+        $group: {
+          _id: '$rating',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: -1 } }
+    ]);
+    
+    // Reviews today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const reviewsToday = await Review.countDocuments({ createdAt: { $gte: today } });
+    
+    // Average rating
+    const avgRating = await Review.aggregate([
+      { $group: { _id: null, avgRating: { $avg: '$rating' } } }
+    ]);
+    
+    // Most active reviewers
+    const topReviewers = await Review.aggregate([
+      {
+        $group: {
+          _id: '$reviewer',
+          reviewCount: { $sum: 1 }
+        }
+      },
+      { $sort: { reviewCount: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'reviewerInfo'
+        }
+      }
+    ]);
+    
+    // Most reviewed targets
+    const topTargets = await Review.aggregate([
+      {
+        $group: {
+          _id: { 
+            reviewType: '$reviewType',
+            targetId: { $ifNull: ['$tripId', '$reviewedUser'] }
+          },
+          reviewCount: { $sum: 1 },
+          avgRating: { $avg: '$rating' }
+        }
+      },
+      { $sort: { reviewCount: -1 } },
+      { $limit: 5 }
+    ]);
+
+    res.status(200).json({
+      totalReviews,
+      pendingReviews,
+      approvedReviews,
+      rejectedReviews,
+      flaggedReviews,
+      reviewsToday,
+      avgRating: avgRating[0]?.avgRating || 0,
+      ratingDistribution: ratingStats,
+      topReviewers,
+      topTargets
+    });
+  } catch (err) {
+    logger.error("Get review stats error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get all flags with filters
+export const getAllFlags = async (req, res) => {
+  try {
+    const { status, severity, type, search, page = 1, limit = 20 } = req.query;
+    const filter = {};
+    
+    if (status === 'pending') {
+      filter.resolved = false;
+      filter.dismissed = false;
+    } else if (status === 'resolved') {
+      filter.resolved = true;
+    } else if (status === 'dismissed') {
+      filter.dismissed = true;
+    } else if (status === 'escalated') {
+      filter.escalated = true;
+    }
+    
+    if (severity) filter.severity = severity;
+    if (type) filter.flagType = type;
+    if (search) {
+      filter.$or = [
+        { reason: { $regex: search, $options: 'i' } },
+        { details: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const skip = (Number(page) - 1) * Number(limit);
+    const flags = await Flag.find(filter)
+      .populate('flaggedBy', 'name email')
+      .populate({
+        path: 'targetId',
+        select: 'name email destination description feedback rating',
+        populate: {
+          path: 'creator',
+          select: 'name email'
+        }
+      })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+    
+    const total = await Flag.countDocuments(filter);
+    
+    res.status(200).json({ flags, total });
+  } catch (err) {
+    logger.error("Get all flags error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Bulk flag operations
+export const bulkFlagOperations = async (req, res) => {
+  try {
+    const { flagIds, action } = req.body;
+    
+    if (!flagIds || !Array.isArray(flagIds) || flagIds.length === 0) {
+      return res.status(400).json({ message: "Flag IDs array is required." });
+    }
+
+    if (!['resolve', 'dismiss', 'delete', 'escalate'].includes(action)) {
+      return res.status(400).json({ message: "Invalid action." });
+    }
+
+    let updateData = {};
+    if (action === 'resolve') {
+      updateData = { resolved: true, resolvedAt: new Date() };
+    } else if (action === 'dismiss') {
+      updateData = { dismissed: true, dismissedAt: new Date() };
+    } else if (action === 'escalate') {
+      updateData = { escalated: true, escalatedAt: new Date() };
+    }
+
+    let result;
+    if (action === 'delete') {
+      result = await Flag.deleteMany({ _id: { $in: flagIds } });
+    } else {
+      result = await Flag.updateMany(
+        { _id: { $in: flagIds } },
+        updateData,
+        { new: true }
+      );
+    }
+
+    // Log bulk flag action
+    await AdminLog.create({
+      adminId: req.user.userId,
+      action: `bulk ${action} flags`,
+      targetFlagIds: flagIds,
+      reason: `Bulk flag ${action} - Admin action`
+    });
+
+    res.status(200).json({
+      message: `${flagIds.length} flags ${action}ed.`,
+      updatedCount: flagIds.length
+    });
+  } catch (err) {
+    logger.error("Bulk flag operations error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Bulk review operations
+export const bulkReviewOperations = async (req, res) => {
+  try {
+    const { reviewIds, action } = req.body;
+    
+    if (!reviewIds || !Array.isArray(reviewIds) || reviewIds.length === 0) {
+      return res.status(400).json({ message: "Review IDs array is required." });
+    }
+
+    if (!['approve', 'reject', 'delete', 'flag', 'unflag'].includes(action)) {
+      return res.status(400).json({ message: "Invalid action." });
+    }
+
+    let updateData = {};
+    if (action === 'approve') {
+      updateData = { status: 'approved' };
+    } else if (action === 'reject') {
+      updateData = { status: 'rejected' };
+    } else if (action === 'flag') {
+      updateData = { flagged: true };
+    } else if (action === 'unflag') {
+      updateData = { flagged: false };
+    }
+
+    let result;
+    if (action === 'delete') {
+      result = await Review.deleteMany({ _id: { $in: reviewIds } });
+    } else {
+      result = await Review.updateMany(
+        { _id: { $in: reviewIds } },
+        updateData,
+        { new: true }
+      );
+    }
+
+    // Log bulk review action
+    await AdminLog.create({
+      adminId: req.user.userId,
+      action: `bulk ${action} reviews`,
+      targetReviewIds: reviewIds,
+      reason: `Bulk review ${action} - Admin action`
+    });
+
+    res.status(200).json({
+      message: `${reviewIds.length} reviews ${action}ed.`,
+      updatedCount: reviewIds.length
+    });
+  } catch (err) {
+    logger.error("Bulk review operations error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -265,17 +1003,196 @@ export const getReports = async (req, res) => {
   }
 };
 
-// Get all admin logs
+// Get all admin logs with enhanced filtering and analytics
 export const getAdminLogs = async (req, res) => {
   try {
-    const logs = await AdminLog.find()
-      .populate('adminId', 'name')
+    const { 
+      page = 1, 
+      limit = 20, 
+      search, 
+      adminId, 
+      action, 
+      dateFrom, 
+      dateTo,
+      status 
+    } = req.query;
+    
+    const filter = {};
+    
+    // Search filter
+    if (search) {
+      filter.$or = [
+        { action: { $regex: search, $options: 'i' } },
+        { reason: { $regex: search, $options: 'i' } },
+        { 'adminId.name': { $regex: search, $options: 'i' } },
+        { 'targetUserId.name': { $regex: search, $options: 'i' } },
+        { 'targetUserId.email': { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Admin filter
+    if (adminId) {
+      filter.adminId = adminId;
+    }
+    
+    // Action filter
+    if (action) {
+      filter.action = { $regex: action, $options: 'i' };
+    }
+    
+    // Date range filter
+    if (dateFrom || dateTo) {
+      filter.createdAt = {};
+      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) filter.createdAt.$lte = new Date(dateTo);
+    }
+    
+    // Status filter
+    if (status) {
+      filter.status = status;
+    }
+    
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    const logs = await AdminLog.find(filter)
+      .populate('adminId', 'name email')
       .populate('targetUserId', 'name email')
-      .sort({ timestamp: -1 });
-    res.status(200).json(logs);
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+    
+    const total = await AdminLog.countDocuments(filter);
+    
+    res.status(200).json({ logs, total, page: Number(page), limit: Number(limit) });
   } catch (err) {
     logger.error("Log Fetch Error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get admin logs analytics
+export const getAdminLogsAnalytics = async (req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.query;
+    
+    const dateFilter = {};
+    if (dateFrom || dateTo) {
+      dateFilter.createdAt = {};
+      if (dateFrom) dateFilter.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) dateFilter.createdAt.$lte = new Date(dateTo);
+    }
+    
+    // Total logs
+    const totalLogs = await AdminLog.countDocuments(dateFilter);
+    
+    // Today's actions
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayActions = await AdminLog.countDocuments({
+      ...dateFilter,
+      createdAt: { $gte: today }
+    });
+    
+    // Action types count
+    const actionTypes = await AdminLog.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: '$action',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]);
+    
+    // Admin activity breakdown
+    const adminActivity = await AdminLog.aggregate([
+      { $match: dateFilter },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'adminId',
+          foreignField: '_id',
+          as: 'admin'
+        }
+      },
+      {
+        $group: {
+          _id: '$adminId',
+          adminName: { $first: '$admin.name' },
+          actionCount: { $sum: 1 }
+        }
+      },
+      { $sort: { actionCount: -1 } },
+      { $limit: 5 }
+    ]);
+    
+    // Daily activity for the last 7 days
+    const dailyActivity = await AdminLog.aggregate([
+      {
+        $match: {
+          ...dateFilter,
+          createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    // Action categories
+    const actionCategories = await AdminLog.aggregate([
+      { $match: dateFilter },
+      {
+        $addFields: {
+          category: {
+            $switch: {
+              branches: [
+                { case: { $regexMatch: { input: '$action', regex: 'user|ban|unban|warn' } }, then: 'User Management' },
+                { case: { $regexMatch: { input: '$action', regex: 'trip|delete.*trip' } }, then: 'Trip Management' },
+                { case: { $regexMatch: { input: '$action', regex: 'review|approve|reject' } }, then: 'Content Moderation' },
+                { case: { $regexMatch: { input: '$action', regex: 'kyc|verify' } }, then: 'KYC Management' },
+                { case: { $regexMatch: { input: '$action', regex: 'flag|resolve|dismiss' } }, then: 'Flag Management' }
+              ],
+              default: 'Other'
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+    
+    // Current active admin
+    const currentAdmin = await AdminLog.findOne()
+      .populate('adminId', 'name email')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      totalLogs,
+      todayActions,
+      actionTypes: actionTypes.length,
+      currentAdmin: currentAdmin?.adminId?.name || 'No recent activity',
+      actionBreakdown: actionTypes,
+      adminActivity,
+      dailyActivity,
+      actionCategories
+    });
+  } catch (err) {
+    logger.error('Get Admin Logs Analytics Error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -331,42 +1248,7 @@ export const resolveFlag = async (req, res) => {
   }
 };
 
-// Update getAllFlags to filter by status
-export const getAllFlags = async (req, res) => {
-  try {
-    const { flagType, reason, page = 1, limit = 20, status = 'open' } = req.query;
-    const filter = {};
-    if (flagType) filter.flagType = flagType;
-    if (reason) filter.reason = reason;
-    if (status) filter.status = status;
-    const skip = (Number(page) - 1) * Number(limit);
-    let flags = await Flag.find(filter)
-      .populate('flaggedBy', 'name email')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit))
-      .lean();
-    // Populate target details
-    for (const flag of flags) {
-      if (flag.flagType === 'user') {
-        const user = await User.findById(flag.targetId).select('name email').lean();
-        flag.targetName = user?.name || '-';
-        flag.targetEmail = user?.email || '-';
-      } else if (flag.flagType === 'trip') {
-        const trip = await Trip.findById(flag.targetId).select('destination').lean();
-        flag.targetDestination = trip?.destination || '-';
-      } else if (flag.flagType === 'review') {
-        const review = await Review.findById(flag.targetId).select('feedback').lean();
-        flag.targetComment = review?.feedback || '-';
-      }
-    }
-    const total = await Flag.countDocuments(filter);
-    res.status(200).json({ flags, total });
-  } catch (err) {
-    logger.error('Fetch All Flags Error:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
+
 
 // Get notification count for a target
 export const getNotificationCount = async (req, res) => {

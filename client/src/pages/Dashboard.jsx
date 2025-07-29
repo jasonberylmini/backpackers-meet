@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useSocket } from '../contexts/SocketContext';
-import './Dashboard.css';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -68,23 +67,24 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-loading">
-          <div className="loading-spinner"></div>
-          <p>Loading your dashboard...</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="loading-spinner mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <header className="dashboard-header">
-        <div className="dashboard-header-content">
-          <div className="user-welcome">
-            <h1>Welcome back, {user.name}! 👋</h1>
-            <p className="user-subtitle">
+    <div className="min-h-screen bg-gray-50 p-6">
+
+      {/* Welcome Section */}
+      <section className="bg-gray-50 border border-gray-200 rounded-2xl p-8 mb-8 shadow-sm">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome back, {user.name}! 👋</h1>
+            <p className="text-lg text-gray-600">
               {new Date().toLocaleDateString('en-US', { 
                 weekday: 'long', 
                 year: 'numeric', 
@@ -93,145 +93,97 @@ export default function Dashboard() {
               })}
             </p>
           </div>
-          <div className="header-actions">
-            <div className="connection-status">
-              <div className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`}></div>
-              <span>{isConnected ? 'Connected' : 'Offline'}</span>
-            </div>
-            <button className="logout-btn" onClick={handleLogout}>
-              Logout
-            </button>
-          </div>
         </div>
-      </header>
+      </section>
 
       {/* Stats Cards */}
-      <section className="dashboard-stats">
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon">🧳</div>
-            <div className="stat-content">
-              <h3>{stats?.totalTrips || 0}</h3>
-              <p>Total Trips</p>
+      <section className="mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-3xl mb-3">🧳</div>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900">{stats?.totalTrips || 0}</h3>
+              <p className="text-gray-600">Total Trips</p>
             </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon">✅</div>
-            <div className="stat-content">
-              <h3>{stats?.completedTrips || 0}</h3>
-              <p>Completed</p>
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-3xl mb-3">✅</div>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900">{stats?.completedTrips || 0}</h3>
+              <p className="text-gray-600">Completed</p>
             </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon">📅</div>
-            <div className="stat-content">
-              <h3>{stats?.upcomingTrips || 0}</h3>
-              <p>Upcoming</p>
+          <div className="bg-purple-50 border border-purple-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-3xl mb-3">📅</div>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900">{stats?.upcomingTrips || 0}</h3>
+              <p className="text-gray-600">Upcoming</p>
             </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon">💰</div>
-            <div className="stat-content">
-              <h3>₹{stats?.totalExpenses || 0}</h3>
-              <p>Total Spent</p>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-3xl mb-3">💰</div>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900">₹{stats?.totalExpenses || 0}</h3>
+              <p className="text-gray-600">Total Spent</p>
             </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon">⭐</div>
-            <div className="stat-content">
-              <h3>{stats?.totalReviews || 0}</h3>
-              <p>Reviews Given</p>
+          <div className="bg-pink-50 border border-pink-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-3xl mb-3">⭐</div>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900">{stats?.totalReviews || 0}</h3>
+              <p className="text-gray-600">Reviews Given</p>
             </div>
           </div>
-          <div className="stat-card verification-status">
-            <div className="stat-icon">
+          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-3xl mb-3">
               {stats?.verificationStatus === 'verified' ? '✅' : '⏳'}
             </div>
-            <div className="stat-content">
-              <h3>{stats?.verificationStatus === 'verified' ? 'Verified' : 'Pending'}</h3>
-              <p>KYC Status</p>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900">{stats?.verificationStatus === 'verified' ? 'Verified' : 'Pending'}</h3>
+              <p className="text-gray-600">KYC Status</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Quick Actions */}
-      <section className="dashboard-actions">
-        <h2>Quick Actions</h2>
-        <div className="actions-grid">
-          <button 
-            className="action-btn primary"
-            onClick={() => navigate('/trips/create')}
-          >
-            <span className="action-icon">➕</span>
-            <span>Create Trip</span>
-          </button>
-          <button 
-            className="action-btn"
-            onClick={() => navigate('/trips/browse')}
-          >
-            <span className="action-icon">🔍</span>
-            <span>Find Trips</span>
-          </button>
-          <button 
-            className="action-btn"
-            onClick={() => navigate('/profile')}
-          >
-            <span className="action-icon">👤</span>
-            <span>Edit Profile</span>
-          </button>
-          <button 
-            className="action-btn"
-            onClick={() => navigate('/expenses')}
-          >
-            <span className="action-icon">💰</span>
-            <span>Track Expenses</span>
-          </button>
-          <button 
-            className="action-btn"
-            onClick={() => navigate('/social')}
-          >
-            <span className="action-icon">💬</span>
-            <span>Social Feed</span>
-          </button>
-          <button 
-            className="action-btn"
-            onClick={() => navigate('/notifications')}
-          >
-            <span className="action-icon">🔔</span>
-            <span>Notifications</span>
-          </button>
-        </div>
-      </section>
+
 
       {/* Recent Trips */}
-      <section className="dashboard-section">
-        <div className="section-header">
-          <h2>Recent Trips</h2>
+      <section className="mb-16">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Recent Trips</h2>
           <button 
-            className="view-all-btn"
+            className="btn btn-secondary"
             onClick={() => navigate('/trips')}
           >
             View All
           </button>
         </div>
         {recentTrips.length > 0 ? (
-          <div className="trips-grid">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {recentTrips.slice(0, 3).map(trip => (
-              <div key={trip._id} className="trip-card">
-                <div className="trip-image">
-                  <img src={trip.image || 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300&h=200&fit=crop'} alt={trip.destination} />
+              <div key={trip._id} className="card overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="h-48 overflow-hidden">
+                  <img 
+                    src={trip.image || 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300&h=200&fit=crop'} 
+                    alt={trip.destination}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  />
                 </div>
-                <div className="trip-content">
-                  <h3>{trip.destination}</h3>
-                  <p className="trip-date">
+                <div className="p-6">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">{trip.destination}</h3>
+                  <p className="text-gray-600 mb-2">
                     {new Date(trip.startDate || trip.date).toLocaleDateString()}
                   </p>
-                  <p className="trip-members">
+                  <p className="text-gray-600 mb-3">
                     {trip.members?.length || 0} members
                   </p>
-                  <div className="trip-status">
-                    <span className={`status-badge ${trip.status || 'upcoming'}`}>
+                  <div className="flex justify-between items-center">
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      (trip.status || 'upcoming') === 'upcoming' ? 'bg-blue-100 text-blue-800' :
+                      (trip.status || 'upcoming') === 'active' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
                       {trip.status || 'Upcoming'}
                     </span>
                   </div>
@@ -240,12 +192,12 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <div className="empty-state">
-            <div className="empty-icon">🧳</div>
-            <h3>No trips yet</h3>
-            <p>Start your journey by creating your first trip!</p>
+          <div className="card p-12 text-center">
+            <div className="text-6xl mb-6 text-gray-400">🧳</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No trips yet</h3>
+            <p className="text-gray-600 mb-6">Start your journey by creating your first trip!</p>
             <button 
-              className="primary-btn"
+              className="btn btn-primary"
               onClick={() => navigate('/trips/create')}
             >
               Create Trip
@@ -255,29 +207,29 @@ export default function Dashboard() {
       </section>
 
       {/* Recent Activity */}
-      <section className="dashboard-section">
-        <div className="section-header">
-          <h2>Recent Activity</h2>
+      <section className="mb-16">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Recent Activity</h2>
           <button 
-            className="view-all-btn"
+            className="btn btn-secondary"
             onClick={() => navigate('/activity')}
           >
             View All
           </button>
         </div>
         {recentActivity.length > 0 ? (
-          <div className="activity-list">
+          <div className="card p-6">
             {recentActivity.slice(0, 5).map((activity, index) => (
-              <div key={index} className="activity-item">
-                <div className="activity-icon">
+              <div key={index} className="flex items-start space-x-4 py-4 border-b border-gray-100 last:border-b-0">
+                <div className="text-2xl">
                   {activity.type === 'trip' && '🧳'}
                   {activity.type === 'review' && '⭐'}
                   {activity.type === 'expense' && '💰'}
                   {activity.type === 'message' && '💬'}
                 </div>
-                <div className="activity-content">
-                  <p className="activity-text">{activity.description}</p>
-                  <span className="activity-time">
+                <div className="flex-1">
+                  <p className="text-gray-900 mb-1">{activity.description}</p>
+                  <span className="text-sm text-gray-500">
                     {new Date(activity.timestamp).toLocaleDateString()}
                   </span>
                 </div>
@@ -285,28 +237,32 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <div className="empty-state">
-            <div className="empty-icon">📝</div>
-            <h3>No recent activity</h3>
-            <p>Your activity will appear here as you use the platform</p>
+          <div className="card p-12 text-center">
+            <div className="text-6xl mb-6 text-gray-400">📝</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No recent activity</h3>
+            <p className="text-gray-600">Your activity will appear here as you use the platform</p>
           </div>
         )}
       </section>
 
       {/* Verification Reminder */}
       {stats?.verificationStatus !== 'verified' && (
-        <section className="dashboard-section">
-          <div className="verification-reminder">
-            <div className="reminder-icon">📋</div>
-            <div className="reminder-content">
-              <h3>Complete Your Verification</h3>
-              <p>Verify your account to unlock all features and build trust with other travelers.</p>
-              <button 
-                className="primary-btn"
-                onClick={() => navigate('/kyc')}
-              >
-                Start Verification
-              </button>
+        <section className="mb-16">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center space-x-6">
+              <div className="bg-amber-500 text-white text-2xl w-16 h-16 rounded-xl flex items-center justify-center">
+                📋
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-amber-900 mb-2">Complete Your Verification</h3>
+                <p className="text-amber-800 mb-4">Verify your account to unlock all features and build trust with other travelers.</p>
+                <button 
+                  className="btn btn-success"
+                  onClick={() => navigate('/kyc')}
+                >
+                  Start Verification
+                </button>
+              </div>
             </div>
           </div>
         </section>

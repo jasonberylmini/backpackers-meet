@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import toast from 'react-hot-toast';
+import './TripChat.css';
 
-const TripChat = ({ tripId, tripName, user }) => {
+const TripChat = ({ tripId, tripName, user, tripDetails }) => {
   const {
     joinRoom, leaveRoom, sendMessage, startTyping, stopTyping,
     socket, isConnected, currentRoom, onlineUsers, typingUsers
@@ -13,6 +14,8 @@ const TripChat = ({ tripId, tripName, user }) => {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  // Add state for sidebar collapse
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     if (tripId) {
@@ -115,154 +118,415 @@ const TripChat = ({ tripId, tripName, user }) => {
 
   return (
     <div className="trip-chat-container" style={{
-      border: '1px solid #e1e5e9',
-      borderRadius: '12px',
-      backgroundColor: '#ffffff',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      maxWidth: '600px',
-      margin: '20px auto'
+      maxWidth: '900px',
+      margin: '20px auto',
+      minHeight: '500px',
     }}>
-      {/* Chat Header */}
-      <div style={{
-        padding: '16px 20px',
-        borderBottom: '1px solid #e1e5e9',
-        backgroundColor: '#f8f9fa',
-        borderRadius: '12px 12px 0 0',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div>
-          <h3 style={{ margin: 0, color: '#2c3e50', fontSize: '18px' }}>
-            {tripName || 'Trip Chat'}
-          </h3>
-          <div style={{ fontSize: '12px', color: '#6c757d' }}>
-            {isConnected ? (
-              <span style={{ color: '#28a745' }}>🟢 Connected</span>
-            ) : (
-              <span style={{ color: '#dc3545' }}>🔴 Disconnected</span>
-            )}
-          </div>
-        </div>
-        <div style={{ fontSize: '12px', color: '#6c757d' }}>
-          {onlineUsers.length} online
-        </div>
-      </div>
-
-      {/* Messages Area */}
-      <div style={{
-        height: '400px',
-        overflowY: 'auto',
-        padding: '16px',
-        backgroundColor: '#f8f9fa'
-      }}>
-        {messages.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            color: '#6c757d',
-            marginTop: '50px'
-          }}>
-            No messages yet. Start the conversation!
-          </div>
-        ) : (
-          messages.map((msg, idx) => (
-            <div key={idx} style={{
-              marginBottom: '12px',
-              display: 'flex',
-              flexDirection: msg.sender?.id === user?.userId ? 'row-reverse' : 'row'
+      {/* Main Chat Area */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* Chat Header */}
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: '1px solid #e1e5e9',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '12px 12px 0 0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <h3 style={{ 
+              margin: 0, 
+              color: '#2c3e50', 
+              fontSize: '20px',
+              fontWeight: '600',
+              marginBottom: '4px'
             }}>
-              <div style={{
-                maxWidth: '70%',
-                padding: '8px 12px',
+              {tripName || 'Trip Chat'}
+            </h3>
+            <div style={{ 
+              fontSize: '14px', 
+              color: '#6B7280',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span style={{
+                background: '#FEE2E2',
+                color: '#DC2626',
+                padding: '2px 8px',
                 borderRadius: '12px',
-                backgroundColor: msg.sender?.id === user?.userId ? '#007bff' : '#ffffff',
-                color: msg.sender?.id === user?.userId ? '#ffffff' : '#2c3e50',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                wordWrap: 'break-word'
+                fontSize: '11px',
+                fontWeight: '500'
               }}>
-                <div style={{ fontSize: '12px', marginBottom: '4px', opacity: 0.8 }}>
-                  {msg.sender?.name || 'Unknown'}
-                </div>
-                <div>{msg.text}</div>
-                <div style={{ fontSize: '10px', marginTop: '4px', opacity: 0.7 }}>
-                  {new Date(msg.timestamp).toLocaleTimeString()}
-                </div>
-              </div>
+                🚨 Trip
+              </span>
+              {tripDetails?.memberCount && (
+                <span>{tripDetails.memberCount} members</span>
+              )}
+              {tripDetails?.location && (
+                <span>• {tripDetails.location}</span>
+              )}
             </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Typing Indicator */}
-      {typingUsers.length > 0 && (
-        <div style={{
-          padding: '8px 16px',
-          fontSize: '12px',
-          color: '#6c757d',
-          fontStyle: 'italic',
-          backgroundColor: '#f8f9fa',
-          borderTop: '1px solid #e1e5e9'
-        }}>
-          {typingUsers.map(u => u.name).join(', ')} typing...
-        </div>
-      )}
-
-      {/* Input Area */}
-      <div style={{
-        padding: '16px',
-        borderTop: '1px solid #e1e5e9',
-        backgroundColor: '#ffffff',
-        borderRadius: '0 0 12px 12px'
-      }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <input
-            type="text"
-            value={input}
-            onChange={handleInputChange}
-            onKeyPress={handleKeyPress}
-            placeholder="Type a message..."
-            disabled={!isConnected}
-            style={{
-              flex: 1,
-              padding: '10px 12px',
-              border: '1px solid #e1e5e9',
-              borderRadius: '8px',
-              fontSize: '14px',
-              outline: 'none',
-              backgroundColor: isConnected ? '#ffffff' : '#f8f9fa'
-            }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={!isConnected || !input.trim()}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: isConnected && input.trim() ? '#007bff' : '#6c757d',
-              color: '#ffffff',
+          </div>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '12px',
+            fontSize: '14px',
+            color: '#6B7280'
+          }}>
+            <span style={{ 
+              padding: '4px 8px', 
+              borderRadius: '4px', 
+              fontSize: '12px',
+              backgroundColor: isConnected ? '#d4edda' : '#f8d7da',
+              color: isConnected ? '#155724' : '#721c24'
+            }}>
+              {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+            </span>
+            <button style={{
+              background: 'none',
               border: 'none',
-              borderRadius: '8px',
-              cursor: isConnected && input.trim() ? 'pointer' : 'not-allowed',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
-          >
-            Send
-          </button>
+              fontSize: '18px',
+              cursor: 'pointer',
+              padding: '4px',
+              borderRadius: '4px',
+              color: '#6B7280'
+            }}>
+              ⋮
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Online Users */}
-      {onlineUsers.length > 0 && (
-        <div style={{
-          padding: '8px 16px',
-          fontSize: '12px',
-          color: '#6c757d',
+        {/* Messages Area */}
+        <div className="messages-area" style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
           backgroundColor: '#f8f9fa',
-          borderTop: '1px solid #e1e5e9'
+          overflow: 'hidden',
         }}>
-          Online: {onlineUsers.map(u => u.name).join(', ')}
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+            padding: '20px',
+          }}>
+            {messages.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                color: '#6c757d',
+                marginTop: '50px'
+              }}>
+                No messages yet. Start the conversation!
+              </div>
+            ) : (
+              messages.map((msg, idx) => (
+                <div key={idx} style={{
+                  display: 'flex',
+                  flexDirection: msg.sender?.id === user?.userId ? 'row-reverse' : 'row',
+                  alignItems: 'flex-end',
+                  marginBottom: '8px',
+                }}>
+                  <div style={{
+                    maxWidth: '70%',
+                    padding: '16px 20px',
+                    borderRadius: '18px',
+                    backgroundColor: msg.sender?.id === user?.userId ? '#dbeafe' : '#f8f9fa',
+                    color: msg.sender?.id === user?.userId ? '#1e3a8a' : '#1e293b',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                    wordWrap: 'break-word',
+                    marginBottom: '20px',
+                    marginTop: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: msg.sender?.id === user?.userId ? 'flex-end' : 'flex-start',
+                    position: 'relative',
+                    border: `1px solid ${msg.sender?.id === user?.userId ? '#bfdbfe' : '#e5e7eb'}`,
+                  }}>
+                    <div style={{
+                      fontSize: '13px',
+                      marginBottom: '8px',
+                      opacity: 0.9,
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      color: msg.sender?.id === user?.userId ? '#1e40af' : '#4b5563',
+                    }}>
+                      {msg.sender?.name || 'Unknown'}
+                      {msg.sender?.role === 'organizer' && (
+                        <span style={{
+                          background: '#dcfce7',
+                          color: '#166534',
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          border: '1px solid #bbf7d0',
+                        }}>👑 Organizer</span>
+                      )}
+                    </div>
+                    <div style={{
+                      marginBottom: '6px',
+                      lineHeight: 1.5,
+                      fontSize: '15px',
+                      wordBreak: 'break-word',
+                    }}>{msg.text}</div>
+                    <div style={{
+                      fontSize: '11px',
+                      marginTop: '6px',
+                      color: '#9ca3af',
+                      alignSelf: 'flex-end',
+                      fontWeight: 500,
+                    }}>{new Date(msg.timestamp).toLocaleTimeString()}</div>
+                  </div>
+                </div>
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+          {/* Typing Indicator */}
+          {typingUsers.length > 0 && (
+            <div style={{
+              padding: '8px 16px',
+              fontSize: '12px',
+              color: '#6c757d',
+              fontStyle: 'italic',
+              backgroundColor: '#f8f9fa',
+              borderTop: '1px solid #e1e5e9'
+            }}>
+              {typingUsers.map(u => u.name).join(', ')} typing...
+            </div>
+          )}
         </div>
+
+        {/* Input Area - Moved outside messages area */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          background: '#ffffff',
+          borderTop: '1px solid #e1e5e9',
+          padding: '16px 20px',
+          borderRadius: '0 0 12px 12px',
+          position: 'relative',
+          zIndex: 2,
+          flexShrink: 0,
+        }}>
+          <form onSubmit={e => { e.preventDefault(); handleSend(); }} style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            width: '100%',
+            margin: 0,
+          }}>
+            <span style={{
+              fontSize: '20px',
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: '50%',
+              transition: 'all 0.2s',
+              background: 'transparent',
+              border: 'none',
+              color: '#6b7280',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '36px',
+              height: '36px',
+              margin: 0,
+            }} title="Emoji">😊</span>
+            <span style={{
+              fontSize: '20px',
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: '50%',
+              transition: 'all 0.2s',
+              background: 'transparent',
+              border: 'none',
+              color: '#6b7280',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '36px',
+              height: '36px',
+              margin: 0,
+            }} title="Attach file">📎</span>
+            <input
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                border: '1px solid #e1e5e9',
+                borderRadius: '24px',
+                fontSize: '15px',
+                outline: 'none',
+                backgroundColor: '#ffffff',
+                transition: 'border-color 0.2s, box-shadow 0.2s',
+                minHeight: '44px',
+                margin: 0,
+                fontFamily: 'inherit',
+              }}
+              type="text"
+              value={input}
+              onChange={handleInputChange}
+              onKeyPress={handleKeyPress}
+              placeholder="Type your message..."
+              disabled={!isConnected}
+            />
+            <button
+              style={{
+                background: '#2563eb',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: '44px',
+                height: '44px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '18px',
+                boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+                transition: 'all 0.2s',
+                flexShrink: 0,
+                margin: 0,
+                padding: 0,
+                fontFamily: 'inherit',
+              }}
+              type="submit"
+              disabled={!isConnected || !input.trim()}
+              aria-label="Send"
+            >
+              ➤
+            </button>
+          </form>
+        </div>
+
+        {/* Online Users */}
+        {onlineUsers.length > 0 && (
+          <div style={{
+            padding: '8px 16px',
+            fontSize: '12px',
+            color: '#6c757d',
+            backgroundColor: '#f8f9fa',
+            borderTop: '1px solid #e1e5e9'
+          }}>
+            Online: {onlineUsers.map(u => u.name).join(', ')}
+          </div>
+        )}
+      </div>
+      {/* Trip Info Sidebar */}
+      {sidebarOpen && (
+        <aside
+          className="trip-info-sidebar"
+          style={{
+            width: '300px',
+            background: '#f9fafb',
+            borderLeft: '1px solid #e1e5e9',
+            padding: '24px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px',
+            position: 'relative',
+            transition: 'transform 0.3s',
+          }}
+        >
+          <button
+            onClick={() => setSidebarOpen(false)}
+            style={{
+              position: 'absolute',
+              top: 12,
+              right: 12,
+              background: '#fff',
+              border: '1px solid #e1e5e9',
+              borderRadius: '50%',
+              width: 32,
+              height: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}
+            aria-label="Collapse trip info"
+          >
+            <span style={{ fontSize: 18 }}>→</span>
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{
+              background: '#fee2e2',
+              color: '#dc2626',
+              borderRadius: '999px',
+              padding: '4px 12px',
+              fontWeight: 600,
+              fontSize: 13,
+            }}>Trip</span>
+            <span style={{ fontWeight: 700, fontSize: 18 }}>{tripDetails?.destination || 'Trip'}</span>
+          </div>
+          <div style={{ color: '#6b7280', fontSize: 14, marginBottom: 8 }}>{tripDetails?.dates}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ background: '#f3e8ff', color: '#a21caf', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📅</span>
+              <span><b>Dates:</b> <span style={{ color: '#6b7280', fontWeight: 400 }}>{tripDetails?.dates}</span></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ background: '#fee2e2', color: '#dc2626', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📍</span>
+              <span><b>Location:</b> <span style={{ color: '#6b7280', fontWeight: 400 }}>{tripDetails?.location}</span></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ background: '#f3e8ff', color: '#a21caf', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👥</span>
+              <span><b>Members:</b> <span style={{ color: '#6b7280', fontWeight: 400 }}>{tripDetails?.memberCount}</span></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ background: '#dbeafe', color: '#1e3a8a', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👑</span>
+              <span><b>Organizer:</b> <span style={{ color: '#6b7280', fontWeight: 400 }}>{tripDetails?.organizer}</span></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ background: '#fef9c3', color: '#ca8a04', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🏨</span>
+              <span><b>Hotel:</b> <span style={{ color: '#6b7280', fontWeight: 400 }}>{tripDetails?.hotel}</span></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ background: '#f3e8ff', color: '#a21caf', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🎯</span>
+              <span><b>Meeting Point:</b> <span style={{ color: '#6b7280', fontWeight: 400 }}>{tripDetails?.meetingPoint}</span></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ background: '#fee2e2', color: '#dc2626', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🚨</span>
+              <span><b>Emergency:</b> <span style={{ color: '#dc2626', background: '#fee2e2', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>{tripDetails?.emergencyContact}</span></span>
+            </div>
+          </div>
+        </aside>
+      )}
+      {/* Sidebar open button for mobile/desktop */}
+      {!sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          style={{
+            position: 'absolute',
+            top: 24,
+            right: 0,
+            background: '#f9fafb',
+            border: '1px solid #e1e5e9',
+            borderRadius: '999px 0 0 999px',
+            width: 36,
+            height: 48,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            zIndex: 2,
+          }}
+          aria-label="Expand trip info"
+        >
+          <span style={{ fontSize: 18 }}>←</span>
+        </button>
       )}
     </div>
   );

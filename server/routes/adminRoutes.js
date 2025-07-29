@@ -2,12 +2,25 @@ import express from 'express';
 import {
   getAllUsers,
   toggleBanUser,
+  bulkToggleBanUsers,
+  bulkKYCVerification,
+  getTripStats,
+  getReportedTrips,
+  bulkTripOperations,
+  getUserStats,
+  getReportedUsers,
+  bulkUserOperations,
+  getFlagStats,
+  getAllFlags,
+  bulkFlagOperations,
+  getReviewStats,
+  bulkReviewOperations,
   getAllTrips,
   getReports,
   getAdminLogs,
+  getAdminLogsAnalytics,
   deleteTrip,
   getFlagsForTarget,
-  getAllFlags,
   getNotificationCount,
   incrementNotificationCount,
   dismissFlag,
@@ -25,15 +38,29 @@ const router = express.Router();
 
 // Dashboard statistics
 router.get('/stats', verifyToken, isAdmin, getStats);
+router.get('/flag-stats', verifyToken, isAdmin, getFlagStats);
+router.get('/trip-stats', verifyToken, isAdmin, getTripStats);
+router.get('/user-stats', verifyToken, isAdmin, getUserStats);
+router.get('/review-stats', verifyToken, isAdmin, getReviewStats);
 
 // Basic token auth for now — later you can add role check
 router.get('/users', verifyToken, isAdmin, getAllUsers);
 router.put('/ban/:id', verifyToken, isAdmin, toggleBanUser);
+router.post('/bulk-ban', verifyToken, isAdmin, bulkToggleBanUsers);
+router.post('/bulk-kyc', verifyToken, isAdmin, bulkKYCVerification);
+router.post('/bulk-trips', verifyToken, isAdmin, bulkTripOperations);
+router.post('/bulk-users', verifyToken, isAdmin, bulkUserOperations);
+router.post('/bulk-flags', verifyToken, isAdmin, bulkFlagOperations);
+router.post('/bulk-reviews', verifyToken, isAdmin, bulkReviewOperations);
+router.get('/flags', verifyToken, isAdmin, getAllFlags);
+router.get('/reported-trips', verifyToken, isAdmin, getReportedTrips);
+router.get('/reported-users', verifyToken, isAdmin, getReportedUsers);
 router.get('/trips', verifyToken, isAdmin, getAllTrips);
 
 // 🔒 Protected for admin
 router.get('/reports', verifyToken, isAdmin, getReports);
 router.get('/logs', verifyToken, isAdmin, getAdminLogs);
+router.get('/logs/analytics', verifyToken, isAdmin, getAdminLogsAnalytics);
 router.get('/flags/:flagType/:targetId', verifyToken, getFlagsForTarget);
 router.get('/all-flags', verifyToken, getAllFlags);
 router.get('/notification-count/:flagType/:targetId', verifyToken, getNotificationCount);

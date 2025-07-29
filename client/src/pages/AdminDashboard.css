@@ -4,6 +4,82 @@
   min-height: 100vh;
   background: linear-gradient(120deg, #e0e7ff 0%, #f9f9f9 100%);
 }
+
+/* Override global navbar styles ONLY for admin pages */
+body.admin-page .main-navbar {
+  display: none !important;
+}
+
+/* Ensure admin pages don't have global header interference */
+body.admin-page {
+  padding-top: 0 !important;
+}
+
+body.admin-page .admin-dashboard-root {
+  padding-top: 0 !important;
+}
+
+body.admin-page .admin-dashboard-root * {
+  box-sizing: border-box;
+}
+
+/* Reset body and html for admin pages ONLY */
+body.admin-page,
+html.admin-page {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* Override any global fixed positioning that might interfere - ONLY for admin pages */
+body.admin-page .admin-dashboard-root {
+  position: relative !important;
+}
+
+/* Ensure non-admin pages are NOT affected by admin styles */
+body:not(.admin-page) .main-navbar {
+  display: flex !important;
+}
+
+body:not(.admin-page) {
+  padding-top: 64px !important;
+}
+
+/* Fix for home/login/signup pages - ensure no sidebar space */
+body:not(.admin-page) .home-root,
+body:not(.admin-page) .signup-bg-dark {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  width: 100% !important;
+}
+
+/* Ensure the main navbar spans full width on non-admin pages */
+body:not(.admin-page) .main-navbar {
+  width: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+}
+
+/* Remove duplicate rule - keeping only the more specific one below */
+
+/* Admin Topbar - Override any global interference - ONLY for admin pages */
+body.admin-page .admin-dashboard-root .admin-topbar,
+body.admin-page .admin-dashboard-root header.admin-topbar {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  margin-left: 220px !important;
+  background: #fff !important;
+  border-bottom: 1px solid #e1e5e9 !important;
+  padding: 0.75rem 2rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-height: 56px !important;
+  z-index: 9999 !important;
+  width: calc(100% - 220px) !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
 .admin-dashboard-main {
   flex: 1;
   display: flex;
@@ -12,11 +88,13 @@
   background: none;
   align-items: stretch;
   margin-left: 220px;
+  position: relative;
 }
 .admin-dashboard-content {
   flex: 1;
   padding: 4rem 2rem 3rem 2rem;
   background: none;
+  margin-top: 56px; /* Account for fixed topbar height */
 }
 
 .admin-dashboard-content > h1,
@@ -353,6 +431,11 @@
 @media (max-width: 900px) {
   .admin-dashboard-main {
     margin-left: 0;
+  }
+  body.admin-page .admin-dashboard-root .admin-topbar {
+    left: 0 !important;
+    margin-left: 0 !important;
+    width: 100% !important;
   }
   .admin-sidebar {
     min-width: 60px;

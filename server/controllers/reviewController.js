@@ -181,18 +181,24 @@ export const getAllReviews = async (req, res) => {
     if (flagged !== undefined) filter.flagged = flagged === 'true';
     if (search) filter.feedback = { $regex: search, $options: 'i' };
     
-    // By default, only show approved reviews unless admin specifies otherwise
+    // For admin panel, show all reviews by default unless specific status is requested
     if (status) {
       filter.status = status;
-    } else {
-      filter.status = 'approved';
     }
+    // Remove the default 'approved' filter to show all reviews for admin
     
     const skip = (Number(page) - 1) * Number(limit);
     const reviews = await Review.find(filter)
       .populate('reviewer', 'name email')
       .populate('reviewedUser', 'name email')
-      .populate('tripId', 'destination date')
+      .populate({
+        path: 'tripId',
+        select: 'destination description startDate endDate budget tripType status',
+        populate: {
+          path: 'creator',
+          select: 'name email'
+        }
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -214,7 +220,14 @@ export const getReviewsForModeration = async (req, res) => {
     const reviews = await Review.find(filter)
       .populate('reviewer', 'name email')
       .populate('reviewedUser', 'name email')
-      .populate('tripId', 'destination date')
+      .populate({
+        path: 'tripId',
+        select: 'destination description startDate endDate budget tripType status',
+        populate: {
+          path: 'creator',
+          select: 'name email'
+        }
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));

@@ -4,287 +4,1167 @@ import toast from 'react-hot-toast';
 import AdminLayout from '../components/AdminLayout';
 import AdminTable from '../components/AdminTable';
 import AdminModal from '../components/AdminModal';
+import { useAdminRealtime } from '../hooks/useAdminRealtime';
 import '../pages/AdminDashboard.css';
 
-const typeStyles = {
-  flag: { background: '#ffe0e0', color: '#d32f2f', icon: '📄' },
-  trip: { background: '#e0f7fa', color: '#00796b', icon: '🧳' },
-  user: { background: '#e0e7ff', color: '#4e54c8', icon: '👤' },
-  other: { background: '#f3f6fd', color: '#222', icon: '📄' },
+// Helper functions
+const getFlagStatus = (flag) => {
+  if (flag.resolved) return 'resolved';
+  if (flag.dismissed) return 'dismissed';
+  if (flag.escalated) return 'escalated';
+  return 'pending';
+};
+
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'resolved': return '#28a745';
+    case 'dismissed': return '#6c757d';
+    case 'escalated': return '#ffc107';
+    case 'pending': return '#007bff';
+    default: return '#6c757d';
+  }
+};
+
+const getSeverityColor = (severity) => {
+  switch (severity) {
+    case 'high': return '#dc3545';
+    case 'medium': return '#ffc107';
+    case 'low': return '#28a745';
+    default: return '#6c757d';
+  }
+};
+
+const formatDate = (date) => {
+  const reviewDate = new Date(date);
+  const now = new Date();
+  const diffTime = Math.abs(now - reviewDate);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 1) return 'Today';
+  if (diffDays === 2) return 'Yesterday';
+  if (diffDays <= 7) return `${diffDays - 1} days ago`;
+  return reviewDate.toLocaleDateString();
+};
+
+const filterByDateRange = (item, filter) => {
+  if (!filter) return true;
+  
+  const itemDate = new Date(item.createdAt);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+  
+  switch (filter) {
+    case 'today':
+      return itemDate >= today;
+    case 'week':
+      return itemDate >= weekAgo;
+    case 'month':
+      return itemDate >= monthAgo;
+    default:
+      return true;
+  }
+};
+
+const filterByStatus = (item, filter) => {
+  if (!filter) return true;
+  const status = getFlagStatus(item);
+  return status === filter;
+};
+
+const filterBySeverity = (item, filter) => {
+  if (!filter) return true;
+  return item.severity === filter;
 };
 
 const REPORT_TABS = [
-  { key: 'flag', label: 'Flag Reports' },
-  { key: 'trip', label: 'Trip Report' },
-  { key: 'user', label: 'User Report' },
+  { key: 'flag', label: 'Flag Reports', icon: '🚩' },
+  { key: 'trip', label: 'Trip Reports', icon: '🧳' },
+  { key: 'user', label: 'User Reports', icon: '👤' },
 ];
 
 export default function AdminReports() {
-  const [summary, setSummary] = useState(null);
+  const [activeTab, setActiveTab] = useState('flag');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('flag');
+  
+  // Data states
+  const [flagStats, setFlagStats] = useState({});
+  const [tripStats, setTripStats] = useState({});
+  const [userStats, setUserStats] = useState({});
+  const [flags, setFlags] = useState([]);
+  const [trips, setTrips] = useState([]);
+  const [users, setUsers] = useState([]);
+  
+  // Filter states
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [severityFilter, setSeverityFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  
+  // Modal states
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalFlags, setModalFlags] = useState([]);
-  const [modalTitle, setModalTitle] = useState('');
-  const [allFlags, setAllFlags] = useState([]);
-  const [flagsPage, setFlagsPage] = useState(1);
-  const [flagsTotal, setFlagsTotal] = useState(0);
-  const [flagsLoading, setFlagsLoading] = useState(false);
-  const FLAGS_LIMIT = 10;
-  const [modalTarget, setModalTarget] = useState({});
-  const [notificationCount, setNotificationCount] = useState(0);
-  const [resolvedFlags, setResolvedFlags] = useState([]);
-  const [dismissedFlags, setDismissedFlags] = useState([]);
-  const [modalError, setModalError] = useState(null);
+  const [modalData, setModalData] = useState(null);
+  const [modalType, setModalType] = useState('');
+  
+  // Bulk operations
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [bulkAction, setBulkAction] = useState('');
+  
+  // Real-time updates
+  const { isConnected, liveFlags } = useAdminRealtime();
 
-  const fetchSummary = async (type) => {
-    setLoading(true);
-    setError(null);
-    setSummary(null);
+  // Fetch flag statistics and data
+  const fetchFlagData = async () => {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      const res = await axios.get(`/api/admin/reports?type=${type}`, { headers });
-      setSummary(res.data);
-      setLoading(false);
+      
+      // Fetch flag statistics
+      const statsRes = await axios.get('/api/admin/flag-stats', { headers });
+      setFlagStats(statsRes.data);
+      
+      // Fetch flags with filters
+      const params = { page, limit };
+      if (statusFilter) params.status = statusFilter;
+      if (severityFilter) params.severity = severityFilter;
+      if (typeFilter) params.type = typeFilter;
+      if (search) params.search = search;
+      
+      const flagsRes = await axios.get('/api/admin/flags', { headers, params });
+      setFlags(flagsRes.data.flags);
     } catch (err) {
-      setError('Failed to load report.');
-      setLoading(false);
+      console.error('Failed to fetch flag data:', err);
     }
   };
 
-  const handleViewDetails = async (flag) => {
-    setModalOpen(true);
-    setModalFlags([]);
-    setModalTitle('');
-    setModalTarget(null);
-    setNotificationCount(0);
-    setModalError(null);
+  // Fetch trip statistics and data
+  const fetchTripData = async () => {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      // Fetch all flag submissions for this target
-      const res = await axios.get(`/api/admin/flags/${flag.flagType}/${flag.targetId}`, { headers });
-      setModalFlags(res.data);
-      setModalTitle(
-        flag.flagType === 'user' ? `Flags for ${flag.targetName} (${flag.targetEmail})` :
-        flag.flagType === 'trip' ? `Flags for ${flag.targetDestination}` :
-        flag.flagType === 'review' ? `Flags for review: ${flag.targetComment?.slice(0, 30)}` :
-        'Flag Details'
-      );
-      setModalTarget(flag);
-      // Fetch notification count
-      const notifRes = await axios.get(`/api/admin/notification-count/${flag.flagType}/${flag.targetId}`, { headers });
-      setNotificationCount(notifRes.data.count);
+      
+      // Fetch trip statistics
+      const statsRes = await axios.get('/api/admin/trip-stats', { headers });
+      setTripStats(statsRes.data);
+      
+      // Fetch reported trips
+      const params = { page, limit };
+      if (statusFilter) params.status = statusFilter;
+      if (search) params.search = search;
+      
+      const tripsRes = await axios.get('/api/admin/reported-trips', { headers, params });
+      setTrips(tripsRes.data.trips);
     } catch (err) {
-      setModalError('Failed to load flag details.');
+      console.error('Failed to fetch trip data:', err);
     }
   };
 
-  const fetchAllFlags = async (page = 1) => {
-    setFlagsLoading(true);
+  // Fetch user statistics and data
+  const fetchUserData = async () => {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      const res = await axios.get(`/api/admin/all-flags?page=${page}&limit=${FLAGS_LIMIT}` , { headers });
-      setAllFlags(res.data.flags);
-      setFlagsTotal(res.data.total);
-      setFlagsLoading(false);
-    } catch {
-      setFlagsLoading(false);
-    }
-  };
-
-  // Fetch resolved/dismissed flags
-  const fetchResolvedFlags = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
-      const res = await axios.get('/api/admin/resolved-flags', { headers });
-      setResolvedFlags(res.data);
+      
+      // Fetch user statistics
+      const statsRes = await axios.get('/api/admin/user-stats', { headers });
+      setUserStats(statsRes.data);
+      
+      // Fetch reported users
+      const params = { page, limit };
+      if (statusFilter) params.status = statusFilter;
+      if (search) params.search = search;
+      
+      const usersRes = await axios.get('/api/admin/reported-users', { headers, params });
+      setUsers(usersRes.data.users);
     } catch (err) {
-      console.error('Failed to fetch resolved flags:', err);
-    }
-  };
-
-  const fetchDismissedFlags = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
-      const res = await axios.get('/api/admin/dismissed-flags', { headers });
-      setDismissedFlags(res.data);
-    } catch (err) {
-      console.error('Failed to fetch dismissed flags:', err);
+      console.error('Failed to fetch user data:', err);
     }
   };
 
   useEffect(() => {
-    fetchSummary(activeTab);
+    setLoading(true);
+    setError(null);
+    
     if (activeTab === 'flag') {
-      fetchAllFlags(flagsPage);
-      fetchResolvedFlags();
-      fetchDismissedFlags();
+      fetchFlagData();
+    } else if (activeTab === 'trip') {
+      fetchTripData();
+    } else if (activeTab === 'user') {
+      fetchUserData();
     }
-  }, [activeTab, flagsPage]);
+    
+    setLoading(false);
+  }, [activeTab, page, statusFilter, severityFilter, typeFilter, search]);
 
-  // Actions
-  const handleDeleteTarget = async () => {
-    if (!window.confirm('Are you sure you want to delete this content?')) return;
+  // Real-time updates
+  useEffect(() => {
+    if (liveFlags.length > 0 && activeTab === 'flag') {
+      setFlags(prev => {
+        const newFlags = [...prev];
+        liveFlags.forEach(newFlag => {
+          const existingIndex = newFlags.findIndex(f => f._id === newFlag._id);
+          if (existingIndex >= 0) {
+            newFlags[existingIndex] = newFlag;
+          } else {
+            newFlags.unshift(newFlag);
+          }
+        });
+        return newFlags.slice(0, limit);
+      });
+      fetchFlagData();
+    }
+  }, [liveFlags]);
+
+  // Filter data based on current tab
+  const getFilteredData = () => {
+    let data = [];
+    if (activeTab === 'flag') data = flags;
+    else if (activeTab === 'trip') data = trips;
+    else if (activeTab === 'user') data = users;
+    
+    return data.filter(item => {
+      const matchesSearch = !search || 
+        item.reason?.toLowerCase().includes(search.toLowerCase()) ||
+        item.targetName?.toLowerCase().includes(search.toLowerCase()) ||
+        item.targetEmail?.toLowerCase().includes(search.toLowerCase());
+      
+      const matchesStatus = filterByStatus(item, statusFilter);
+      const matchesSeverity = filterBySeverity(item, severityFilter);
+      const matchesDate = filterByDateRange(item, dateFilter);
+      
+      return matchesSearch && matchesStatus && matchesSeverity && matchesDate;
+    });
+  };
+
+  // Bulk operations
+  const handleBulkAction = async () => {
+    if (!bulkAction || selectedItems.length === 0) return;
+    
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.delete(`/api/admin/${modalTarget.flagType}/${modalTarget.targetId}`, { headers });
-      toast.success('Content deleted successfully.');
-      setModalOpen(false);
-      fetchSummary(activeTab);
+      
+      let endpoint = '';
+      let data = { itemIds: selectedItems, action: bulkAction };
+      
+      if (activeTab === 'flag') {
+        endpoint = '/api/admin/bulk-flags';
+        data = { flagIds: selectedItems, action: bulkAction };
+      } else if (activeTab === 'trip') {
+        endpoint = '/api/admin/bulk-trips';
+        data = { tripIds: selectedItems, action: bulkAction };
+      } else if (activeTab === 'user') {
+        endpoint = '/api/admin/bulk-users';
+        data = { userIds: selectedItems, action: bulkAction };
+      }
+      
+      await axios.post(endpoint, data, { headers });
+      
+      toast.success(`${selectedItems.length} ${activeTab}s ${bulkAction}ed!`);
+      setSelectedItems([]);
+      setBulkAction('');
+      
+      // Refresh data
+      if (activeTab === 'flag') fetchFlagData();
+      else if (activeTab === 'trip') fetchTripData();
+      else if (activeTab === 'user') fetchUserData();
     } catch (err) {
-      toast.error('Failed to delete content.');
+      toast.error('Failed to perform bulk action.');
     }
   };
 
-  const handleBanUser = async () => {
-    if (!window.confirm('Are you sure you want to ban this user?')) return;
+  // Individual actions
+  const handleResolve = async (itemId) => {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.patch(`/api/admin/users/${modalTarget.targetId}/status`, { status: 'banned' }, { headers });
-      toast.success('User banned successfully.');
-      setModalOpen(false);
-      fetchSummary(activeTab);
+      await axios.patch(`/api/admin/${activeTab}/${itemId}/resolve`, {}, { headers });
+      toast.success('Item resolved successfully!');
+      
+      if (activeTab === 'flag') fetchFlagData();
+      else if (activeTab === 'trip') fetchTripData();
+      else if (activeTab === 'user') fetchUserData();
+    } catch (err) {
+      toast.error('Failed to resolve item.');
+    }
+  };
+
+  const handleDismiss = async (itemId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.patch(`/api/admin/${activeTab}/${itemId}/dismiss`, {}, { headers });
+      toast.success('Item dismissed successfully!');
+      
+      if (activeTab === 'flag') fetchFlagData();
+      else if (activeTab === 'trip') fetchTripData();
+      else if (activeTab === 'user') fetchUserData();
+    } catch (err) {
+      toast.error('Failed to dismiss item.');
+    }
+  };
+
+  const handleDelete = async (itemId) => {
+    if (!window.confirm('Are you sure you want to delete this item?')) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.delete(`/api/admin/${activeTab}/${itemId}`, { headers });
+      toast.success('Item deleted successfully!');
+      
+      if (activeTab === 'flag') fetchFlagData();
+      else if (activeTab === 'trip') fetchTripData();
+      else if (activeTab === 'user') fetchUserData();
+    } catch (err) {
+      toast.error('Failed to delete item.');
+    }
+  };
+
+  const handleBan = async (itemId) => {
+    if (!window.confirm('Are you sure you want to ban this user?')) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.patch(`/api/admin/users/${itemId}/ban`, {}, { headers });
+      toast.success('User banned successfully!');
+      fetchUserData();
     } catch (err) {
       toast.error('Failed to ban user.');
     }
   };
 
-  const handleDismissFlag = async () => {
+  const handleUnban = async (itemId) => {
+    if (!window.confirm('Are you sure you want to unban this user?')) return;
+    
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.patch(`/api/admin/flags/${modalTarget._id}/dismiss`, {}, { headers });
-      toast.success('Flag dismissed successfully.');
-      setModalOpen(false);
-      fetchSummary(activeTab);
-      fetchAllFlags(flagsPage);
+      await axios.patch(`/api/admin/users/${itemId}/unban`, {}, { headers });
+      toast.success('User unbanned successfully!');
+      fetchUserData();
     } catch (err) {
-      toast.error('Failed to dismiss flag.');
+      toast.error('Failed to unban user.');
     }
   };
 
-  const tabStyle = (active) => ({
-    padding: '0.75rem 1.5rem',
-    marginRight: '0.5rem',
-    border: 'none',
-    borderRadius: '0.5rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    background: active ? '#4e54c8' : '#f8f9fa',
-    color: active ? 'white' : '#666',
-    fontSize: '0.95rem',
-  });
-
-  const cardStyle = {
-    display: 'flex',
-    background: '#fff',
-    borderRadius: 12,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    overflow: 'hidden',
-    marginBottom: 24,
+  const handleWarn = async (itemId) => {
+    if (!window.confirm('Are you sure you want to warn this user?')) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.patch(`/api/admin/users/${itemId}/warn`, {}, { headers });
+      toast.success('User warned successfully!');
+      fetchUserData();
+    } catch (err) {
+      toast.error('Failed to warn user.');
+    }
   };
 
-  const iconColStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '2rem',
-    minWidth: 120,
-    background: '#f8f9fa',
+  const handleSuspend = async (itemId) => {
+    if (!window.confirm('Are you sure you want to suspend this trip?')) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.patch(`/api/admin/trips/${itemId}/suspend`, {}, { headers });
+      toast.success('Trip suspended successfully!');
+      fetchTripData();
+    } catch (err) {
+      toast.error('Failed to suspend trip.');
+    }
   };
 
-  const summaryColStyle = {
-    flex: 1,
-    padding: '2rem',
+  // Modal functions
+  const openModal = (data, type) => {
+    setModalData(data);
+    setModalType(type);
+    setModalOpen(true);
   };
 
-  const sectionTitle = {
-    fontWeight: 700,
-    fontSize: '1.1rem',
-    color: '#4e54c8',
-    marginBottom: 8,
-    marginTop: 16,
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalData(null);
+    setModalType('');
   };
 
-  const labelStyle = {
-    color: '#666',
-    fontSize: '0.9rem',
-  };
-
-  const listStyle = {
-    margin: '8px 0',
-    paddingLeft: '1.5rem',
-    fontSize: '0.95rem',
-    lineHeight: 1.6,
-  };
-
-  const handleEditTarget = () => {
-    // TODO: Implement edit functionality
-    toast.info('Edit functionality coming soon.');
-  };
-
-  const handleWarnUser = () => {
-    // TODO: Implement warning system
-    toast.info('Warning system coming soon.');
-  };
-
-  const handleViewRelatedFlags = () => {
-    // TODO: Implement related flags view
-    toast.info('Related flags view coming soon.');
-  };
-
-  const fetchFlagDetails = (flagType, targetId, modalTitle, modalTarget) => {
-    // Compose a flag object compatible with handleViewDetails
-    const flag = {
-      flagType,
-      targetId,
-      // For modal title and display, pass through extra info
-      ...modalTarget,
-    };
-    handleViewDetails(flag);
-  };
-
-  // Table columns for all flags
+  // Enhanced columns for flags
   const flagColumns = [
-    { key: 'flagType', label: 'Type', sortable: true, render: f => f.flagType },
-    { key: 'target', label: 'Target', sortable: true, render: f => 
-      f.flagType === 'user' ? `${f.targetName} (${f.targetEmail})` :
-      f.flagType === 'trip' ? f.targetDestination :
-      f.flagType === 'review' ? f.targetComment :
-      '-'
+    { 
+      key: 'type', 
+      label: 'Type', 
+      sortable: true, 
+      render: f => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            backgroundColor: f.flagType === 'user' ? '#007bff' : f.flagType === 'trip' ? '#28a745' : '#ffc107',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: 12,
+            fontWeight: 'bold'
+          }}>
+            {f.flagType === 'user' ? 'U' : f.flagType === 'trip' ? 'T' : 'R'}
+          </div>
+          <span style={{ textTransform: 'capitalize' }}>{f.flagType}</span>
+        </div>
+      )
     },
-    { key: 'reason', label: 'Reason', sortable: true, render: f => f.reason },
-    { key: 'flaggedBy', label: 'Reporter', sortable: true, render: f => `${f.flaggedBy?.name || 'Unknown'} (${f.flaggedBy?.email || '-'})` },
-    { key: 'createdAt', label: 'Date', sortable: true, render: f => new Date(f.createdAt).toLocaleString() },
+    { 
+      key: 'target', 
+      label: 'Target', 
+      sortable: true, 
+      render: f => {
+        let targetName = 'Unknown';
+        let targetEmail = f.flagType;
+        
+        if (f.targetId) {
+          if (f.flagType === 'user') {
+            targetName = f.targetId.name || 'Unknown User';
+            targetEmail = f.targetId.email || 'No email';
+          } else if (f.flagType === 'trip') {
+            targetName = f.targetId.destination || 'Unknown Trip';
+            targetEmail = f.targetId.creator?.name || 'Unknown Creator';
+          } else if (f.flagType === 'review') {
+            targetName = f.targetId.feedback?.substring(0, 30) || 'Unknown Review';
+            targetEmail = f.targetId.rating ? `${f.targetId.rating}★` : 'No rating';
+          }
+        }
+        
+        return (
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: 14 }}>
+              {targetName}
+            </div>
+            <div style={{ fontSize: 12, color: '#6c757d' }}>
+              {targetEmail}
+            </div>
+          </div>
+        );
+      }
+    },
+    { 
+      key: 'reason', 
+      label: 'Reason', 
+      sortable: true, 
+      render: f => (
+        <div style={{ maxWidth: 200 }}>
+          <div style={{ fontSize: 14, color: '#495057' }}>
+            {f.reason}
+          </div>
+          {f.details && (
+            <div style={{ fontSize: 12, color: '#6c757d', marginTop: 4 }}>
+              {f.details.substring(0, 50)}...
+            </div>
+          )}
+        </div>
+      )
+    },
+    { 
+      key: 'severity', 
+      label: 'Severity', 
+      sortable: true, 
+      render: f => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: getSeverityColor(f.severity)
+          }} />
+          <span style={{ 
+            color: getSeverityColor(f.severity),
+            fontWeight: 'bold',
+            fontSize: 12,
+            textTransform: 'uppercase'
+          }}>
+            {f.severity || 'medium'}
+          </span>
+        </div>
+      )
+    },
+    { 
+      key: 'status', 
+      label: 'Status', 
+      sortable: true, 
+      render: f => {
+        const status = getFlagStatus(f);
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: getStatusColor(status)
+            }} />
+            <span style={{ 
+              color: getStatusColor(status),
+              fontWeight: 'bold',
+              fontSize: 12,
+              textTransform: 'uppercase'
+            }}>
+              {status}
+            </span>
+          </div>
+        );
+      }
+    },
+    { 
+      key: 'reporter', 
+      label: 'Reporter', 
+      sortable: true, 
+      render: f => (
+        <div>
+          <div style={{ fontWeight: 'bold', fontSize: 14 }}>
+            {f.flaggedBy?.name || 'Anonymous'}
+          </div>
+          <div style={{ fontSize: 12, color: '#6c757d' }}>
+            {f.flaggedBy?.email || 'No email'}
+          </div>
+        </div>
+      )
+    },
+    { 
+      key: 'createdAt', 
+      label: 'Date', 
+      sortable: true, 
+      render: f => (
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 'bold' }}>
+            {formatDate(f.createdAt)}
+          </div>
+          <div style={{ fontSize: 12, color: '#6c757d' }}>
+            {new Date(f.createdAt).toLocaleDateString()}
+          </div>
+        </div>
+      )
+    },
   ];
 
+  // Enhanced actions for flags
   const flagActions = (flag) => (
-    <button 
-      onClick={() => handleViewDetails(flag)} 
-      style={{ 
-        fontSize: 12, 
-        color: '#4e54c8', 
-        background: 'none', 
-        border: 'none', 
-        cursor: 'pointer', 
-        textDecoration: 'underline' 
-      }}
-    >
-      View Details
-    </button>
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      <button 
+        onClick={() => openModal(flag, 'flag')}
+        style={{ 
+          padding: '4px 8px',
+          backgroundColor: '#007bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: 4,
+          fontSize: 12,
+          cursor: 'pointer'
+        }}
+      >
+        View
+      </button>
+      {getFlagStatus(flag) === 'pending' && (
+        <>
+          <button 
+            onClick={() => handleResolve(flag._id)}
+            style={{ 
+              padding: '4px 8px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              fontSize: 12,
+              cursor: 'pointer'
+            }}
+          >
+            Resolve
+          </button>
+          <button 
+            onClick={() => handleDismiss(flag._id)}
+            style={{ 
+              padding: '4px 8px',
+              backgroundColor: '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              fontSize: 12,
+              cursor: 'pointer'
+            }}
+          >
+            Dismiss
+          </button>
+        </>
+      )}
+      <button 
+        onClick={() => handleDelete(flag._id)}
+        style={{ 
+          padding: '4px 8px',
+          backgroundColor: '#dc3545',
+          color: 'white',
+          border: 'none',
+          borderRadius: 4,
+          fontSize: 12,
+          cursor: 'pointer'
+        }}
+      >
+        Delete
+      </button>
+    </div>
   );
 
-  const pageCount = Math.ceil(flagsTotal / FLAGS_LIMIT);
+  // Trip columns
+  const tripColumns = [
+    { 
+      key: 'destination', 
+      label: 'Destination', 
+      sortable: true, 
+      render: t => (
+        <div>
+          <div style={{ fontWeight: 'bold', fontSize: 14 }}>
+            {t.destination}
+          </div>
+          <div style={{ fontSize: 12, color: '#6c757d' }}>
+            {t.tripType}
+          </div>
+        </div>
+      )
+    },
+    { 
+      key: 'creator', 
+      label: 'Creator', 
+      sortable: true, 
+      render: t => (
+        <div>
+          <div style={{ fontWeight: 'bold', fontSize: 14 }}>
+            {t.creator?.name || 'Unknown'}
+          </div>
+          <div style={{ fontSize: 12, color: '#6c757d' }}>
+            {t.creator?.email || '-'}
+          </div>
+        </div>
+      )
+    },
+    { 
+      key: 'dates', 
+      label: 'Dates', 
+      sortable: true, 
+      render: t => (
+        <div>
+          <div style={{ fontSize: 14 }}>
+            {t.startDate} - {t.endDate}
+          </div>
+          <div style={{ fontSize: 12, color: '#6c757d' }}>
+            {t.status}
+          </div>
+        </div>
+      )
+    },
+    { 
+      key: 'budget', 
+      label: 'Budget', 
+      sortable: true, 
+      render: t => (
+        <div style={{ fontWeight: 'bold', color: '#28a745' }}>
+          ₹{t.budget}
+        </div>
+      )
+    },
+    { 
+      key: 'description', 
+      label: 'Description', 
+      sortable: true, 
+      render: t => (
+        <div style={{ maxWidth: 200 }}>
+          <div style={{ fontSize: 14, color: '#495057' }}>
+            {t.description?.substring(0, 50)}...
+          </div>
+        </div>
+      )
+    },
+    { 
+      key: 'createdAt', 
+      label: 'Created', 
+      sortable: true, 
+      render: t => (
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 'bold' }}>
+            {formatDate(t.createdAt)}
+          </div>
+          <div style={{ fontSize: 12, color: '#6c757d' }}>
+            {new Date(t.createdAt).toLocaleDateString()}
+          </div>
+        </div>
+      )
+    },
+  ];
+
+  // Trip actions
+  const tripActions = (trip) => (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      <button 
+        onClick={() => openModal(trip, 'trip')}
+        style={{ 
+          padding: '4px 8px',
+          backgroundColor: '#007bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: 4,
+          fontSize: 12,
+          cursor: 'pointer'
+        }}
+      >
+        View
+      </button>
+      {trip.status === 'active' && (
+        <button 
+          onClick={() => handleSuspend(trip._id)}
+          style={{ 
+            padding: '4px 8px',
+            backgroundColor: '#ffc107',
+            color: 'white',
+            border: 'none',
+            borderRadius: 4,
+            fontSize: 12,
+            cursor: 'pointer'
+          }}
+        >
+          Suspend
+        </button>
+      )}
+      <button 
+        onClick={() => handleDelete(trip._id)}
+        style={{ 
+          padding: '4px 8px',
+          backgroundColor: '#dc3545',
+          color: 'white',
+          border: 'none',
+          borderRadius: 4,
+          fontSize: 12,
+          cursor: 'pointer'
+        }}
+      >
+        Delete
+      </button>
+    </div>
+  );
+
+  // User columns
+  const userColumns = [
+    { 
+      key: 'name', 
+      label: 'User', 
+      sortable: true, 
+      render: u => (
+        <div>
+          <div style={{ fontWeight: 'bold', fontSize: 14 }}>
+            {u.name}
+          </div>
+          <div style={{ fontSize: 12, color: '#6c757d' }}>
+            {u.email}
+          </div>
+        </div>
+      )
+    },
+    { 
+      key: 'status', 
+      label: 'Status', 
+      sortable: true, 
+      render: u => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: u.status === 'active' ? '#28a745' : '#dc3545'
+          }} />
+          <span style={{ 
+            color: u.status === 'active' ? '#28a745' : '#dc3545',
+            fontWeight: 'bold',
+            fontSize: 12,
+            textTransform: 'uppercase'
+          }}>
+            {u.status || 'active'}
+          </span>
+        </div>
+      )
+    },
+    { 
+      key: 'verificationStatus', 
+      label: 'Verification', 
+      sortable: true, 
+      render: u => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: u.verificationStatus === 'verified' ? '#28a745' : '#ffc107'
+          }} />
+          <span style={{ 
+            color: u.verificationStatus === 'verified' ? '#28a745' : '#ffc107',
+            fontWeight: 'bold',
+            fontSize: 12,
+            textTransform: 'uppercase'
+          }}>
+            {u.verificationStatus || 'pending'}
+          </span>
+        </div>
+      )
+    },
+    { 
+      key: 'createdAt', 
+      label: 'Joined', 
+      sortable: true, 
+      render: u => (
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 'bold' }}>
+            {formatDate(u.createdAt)}
+          </div>
+          <div style={{ fontSize: 12, color: '#6c757d' }}>
+            {new Date(u.createdAt).toLocaleDateString()}
+          </div>
+        </div>
+      )
+    },
+  ];
+
+  // User actions
+  const userActions = (user) => (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      <button 
+        onClick={() => openModal(user, 'user')}
+        style={{ 
+          padding: '4px 8px',
+          backgroundColor: '#007bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: 4,
+          fontSize: 12,
+          cursor: 'pointer'
+        }}
+      >
+        View
+      </button>
+      {user.status === 'active' && (
+        <button 
+          onClick={() => handleBan(user._id)}
+          style={{ 
+            padding: '4px 8px',
+            backgroundColor: '#dc3545',
+            color: 'white',
+            border: 'none',
+            borderRadius: 4,
+            fontSize: 12,
+            cursor: 'pointer'
+          }}
+        >
+          Ban
+        </button>
+      )}
+      {user.status === 'banned' && (
+        <button 
+          onClick={() => handleUnban(user._id)}
+          style={{ 
+            padding: '4px 8px',
+            backgroundColor: '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: 4,
+            fontSize: 12,
+            cursor: 'pointer'
+          }}
+        >
+          Unban
+        </button>
+      )}
+      <button 
+        onClick={() => handleWarn(user._id)}
+        style={{ 
+          padding: '4px 8px',
+          backgroundColor: '#ffc107',
+          color: 'white',
+          border: 'none',
+          borderRadius: 4,
+          fontSize: 12,
+          cursor: 'pointer'
+        }}
+      >
+        Warn
+      </button>
+    </div>
+  );
+
+  // Enhanced modal content
+  const renderEnhancedModal = (data, type) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      {/* Left Column - Details */}
+      <div>
+        <h3 style={{ marginBottom: 16, color: '#495057' }}>Report Details</h3>
+        
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontWeight: 'bold', color: '#495057' }}>Type:</label>
+          <div style={{ marginTop: 4 }}>
+            <span style={{
+              backgroundColor: type === 'user' ? '#007bff' : type === 'trip' ? '#28a745' : '#ffc107',
+              color: 'white',
+              padding: '4px 8px',
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: 'bold',
+              textTransform: 'uppercase'
+            }}>
+              {type} Report
+            </span>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontWeight: 'bold', color: '#495057' }}>Reason:</label>
+          <div style={{ 
+            marginTop: 4, 
+            padding: 12, 
+            backgroundColor: '#f8f9fa', 
+            borderRadius: 6,
+            lineHeight: 1.5,
+            color: '#495057'
+          }}>
+            {data.reason}
+          </div>
+        </div>
+
+        {data.details && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontWeight: 'bold', color: '#495057' }}>Details:</label>
+            <div style={{ 
+              marginTop: 4, 
+              padding: 12, 
+              backgroundColor: '#f8f9fa', 
+              borderRadius: 6,
+              lineHeight: 1.5,
+              color: '#495057'
+            }}>
+              {data.details}
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontWeight: 'bold', color: '#495057' }}>Severity:</label>
+          <div style={{ marginTop: 4 }}>
+            <span style={{
+              backgroundColor: getSeverityColor(data.severity),
+              color: 'white',
+              padding: '4px 8px',
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: 'bold',
+              textTransform: 'uppercase'
+            }}>
+              {data.severity || 'medium'}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontWeight: 'bold', color: '#495057' }}>Status:</label>
+          <div style={{ marginTop: 4 }}>
+            <span style={{
+              backgroundColor: getStatusColor(getFlagStatus(data)),
+              color: 'white',
+              padding: '4px 8px',
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: 'bold',
+              textTransform: 'uppercase'
+            }}>
+              {getFlagStatus(data)}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontWeight: 'bold', color: '#495057' }}>Reported:</label>
+          <div style={{ marginTop: 4, color: '#6c757d' }}>
+            {new Date(data.createdAt).toLocaleString()}
+          </div>
+        </div>
+      </div>
+
+      {/* Right Column - Target & Actions */}
+      <div>
+        <h3 style={{ marginBottom: 16, color: '#495057' }}>Target Information</h3>
+        
+        {/* Target Info */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ 
+            padding: 12, 
+            backgroundColor: '#f8f9fa', 
+            borderRadius: 6 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+              <div style={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                backgroundColor: type === 'user' ? '#007bff' : type === 'trip' ? '#28a745' : '#ffc107',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontWeight: 'bold'
+              }}>
+                {type === 'user' ? 'U' : type === 'trip' ? 'T' : 'R'}
+              </div>
+              <div>
+                <div style={{ fontWeight: 'bold', fontSize: 16 }}>
+                  {(() => {
+                    if (data.targetId) {
+                      if (data.flagType === 'user') {
+                        return data.targetId.name || 'Unknown User';
+                      } else if (data.flagType === 'trip') {
+                        return data.targetId.destination || 'Unknown Trip';
+                      } else if (data.flagType === 'review') {
+                        return data.targetId.feedback?.substring(0, 30) || 'Unknown Review';
+                      }
+                    }
+                    return 'Unknown';
+                  })()}
+                </div>
+                <div style={{ color: '#6c757d', fontSize: 14 }}>
+                  {(() => {
+                    if (data.targetId) {
+                      if (data.flagType === 'user') {
+                        return data.targetId.email || 'No email';
+                      } else if (data.flagType === 'trip') {
+                        return data.targetId.creator?.name || 'Unknown Creator';
+                      } else if (data.flagType === 'review') {
+                        return data.targetId.rating ? `${data.targetId.rating}★` : 'No rating';
+                      }
+                    }
+                    return data.flagType || 'Unknown';
+                  })()}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Reporter Info */}
+        <div style={{ marginBottom: 20 }}>
+          <h4 style={{ marginBottom: 8, color: '#495057' }}>Reporter</h4>
+          <div style={{ 
+            padding: 12, 
+            backgroundColor: '#f8f9fa', 
+            borderRadius: 6 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+              <div style={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                backgroundColor: '#6c757d',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontWeight: 'bold'
+              }}>
+                {data.flaggedBy?.name?.charAt(0)?.toUpperCase() || 'A'}
+              </div>
+              <div>
+                <div style={{ fontWeight: 'bold', fontSize: 16 }}>
+                  {data.flaggedBy?.name || 'Anonymous'}
+                </div>
+                <div style={{ color: '#6c757d', fontSize: 14 }}>
+                  {data.flaggedBy?.email || 'No email provided'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ marginTop: 24 }}>
+          <h4 style={{ marginBottom: 12, color: '#495057' }}>Actions</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {getFlagStatus(data) === 'pending' && (
+              <>
+                <button 
+                  onClick={() => handleResolve(data._id)}
+                  style={{ 
+                    padding: '8px 16px',
+                    backgroundColor: '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontSize: 14
+                  }}
+                >
+                  ✅ Resolve Report
+                </button>
+                <button 
+                  onClick={() => handleDismiss(data._id)}
+                  style={{ 
+                    padding: '8px 16px',
+                    backgroundColor: '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontSize: 14
+                  }}
+                >
+                  ❌ Dismiss Report
+                </button>
+              </>
+            )}
+            <button 
+              onClick={() => handleDelete(data._id)}
+              style={{ 
+                padding: '8px 16px',
+                backgroundColor: '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 14
+              }}
+            >
+              🗑️ Delete Content
+            </button>
+            {type === 'user' && (
+              <button 
+                onClick={() => handleBan(data.targetId || data._id)}
+                style={{ 
+                  padding: '8px 16px',
+                  backgroundColor: '#ff9800',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: 14
+                }}
+              >
+                🚷 Ban User
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const filteredData = getFilteredData();
+  const pageCount = Math.ceil(filteredData.length / limit);
 
   return (
     <AdminLayout>
@@ -295,12 +1175,465 @@ export default function AdminReports() {
         {REPORT_TABS.map(tab => (
           <button
             key={tab.key}
-            style={tabStyle(activeTab === tab.key)}
+            style={{
+              padding: '12px 24px',
+              marginRight: '8px',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              background: activeTab === tab.key ? '#4e54c8' : '#f8f9fa',
+              color: activeTab === tab.key ? 'white' : '#666',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
             onClick={() => setActiveTab(tab.key)}
           >
+            <span>{tab.icon}</span>
             {tab.label}
           </button>
         ))}
+      </div>
+
+      {/* Statistics Dashboard */}
+      {activeTab === 'flag' && flagStats && (
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: 16, 
+          marginBottom: 24 
+        }}>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#dc3545', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {flagStats.totalFlags || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Total Flags</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#007bff', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {flagStats.pendingFlags || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Pending Review</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#28a745', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {flagStats.resolvedFlags || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Resolved</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#ffc107', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {flagStats.avgResolutionTime || '0'}h
+            </div>
+            <div style={{ fontSize: 14 }}>Avg Resolution</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#6f42c1', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {flagStats.flagsToday || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Today</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#fd7e14', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {flagStats.highPriorityFlags || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>High Priority</div>
+          </div>
+        </div>
+      )}
+
+      {/* Trip Reports Statistics Dashboard */}
+      {activeTab === 'trip' && tripStats && (
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: 16, 
+          marginBottom: 24 
+        }}>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#28a745', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {tripStats.totalTrips || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Total Trips</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#007bff', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {tripStats.activeTrips || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Active Trips</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#6f42c1', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {tripStats.completedTrips || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Completed</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#dc3545', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {tripStats.reportedTrips || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Reported</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#ffc107', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              ₹{Math.round(tripStats.avgBudget || 0)}
+            </div>
+            <div style={{ fontSize: 14 }}>Avg Budget</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#fd7e14', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {tripStats.tripsToday || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Today</div>
+          </div>
+        </div>
+      )}
+
+      {/* User Reports Statistics Dashboard */}
+      {activeTab === 'user' && userStats && (
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: 16, 
+          marginBottom: 24 
+        }}>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#28a745', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {userStats.totalUsers || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Total Users</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#007bff', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {userStats.activeUsers || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Active Users</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#dc3545', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {userStats.bannedUsers || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Banned Users</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#ffc107', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {userStats.reportedUsers || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>Reported</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#6f42c1', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {userStats.newUsersToday || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>New Today</div>
+          </div>
+          <div style={{ 
+            padding: 20, 
+            backgroundColor: '#fd7e14', 
+            color: 'white', 
+            borderRadius: 8,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold' }}>
+              {userStats.newUsersThisWeek || 0}
+            </div>
+            <div style={{ fontSize: 14 }}>New This Week</div>
+          </div>
+        </div>
+      )}
+
+      {/* Search and Filters */}
+      <div style={{ 
+        display: 'flex', 
+        gap: 16, 
+        marginBottom: 24, 
+        flexWrap: 'wrap',
+        alignItems: 'center'
+      }}>
+        <input 
+          type="text" 
+          placeholder={`Search ${activeTab} reports...`}
+          value={search} 
+          onChange={e => { setSearch(e.target.value); setPage(1); }} 
+          style={{ 
+            padding: 10, 
+            borderRadius: 6, 
+            border: '1px solid #e1e5e9', 
+            minWidth: 250,
+            fontSize: 14
+          }}
+        />
+        <select 
+          value={statusFilter} 
+          onChange={e => { setStatusFilter(e.target.value); setPage(1); }} 
+          style={{ 
+            padding: 10, 
+            borderRadius: 6, 
+            border: '1px solid #e1e5e9',
+            fontSize: 14
+          }}
+        >
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="resolved">Resolved</option>
+          <option value="dismissed">Dismissed</option>
+          <option value="escalated">Escalated</option>
+        </select>
+        {activeTab === 'flag' && (
+          <select 
+            value={severityFilter} 
+            onChange={e => { setSeverityFilter(e.target.value); setPage(1); }} 
+            style={{ 
+              padding: 10, 
+              borderRadius: 6, 
+              border: '1px solid #e1e5e9',
+              fontSize: 14
+            }}
+          >
+            <option value="">All Severity</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        )}
+        {activeTab === 'flag' && (
+          <select 
+            value={typeFilter} 
+            onChange={e => { setTypeFilter(e.target.value); setPage(1); }} 
+            style={{ 
+              padding: 10, 
+              borderRadius: 6, 
+              border: '1px solid #e1e5e9',
+              fontSize: 14
+            }}
+          >
+            <option value="">All Types</option>
+            <option value="user">User</option>
+            <option value="trip">Trip</option>
+            <option value="review">Review</option>
+          </select>
+        )}
+        <select 
+          value={dateFilter} 
+          onChange={e => { setDateFilter(e.target.value); setPage(1); }} 
+          style={{ 
+            padding: 10, 
+            borderRadius: 6, 
+            border: '1px solid #e1e5e9',
+            fontSize: 14
+          }}
+        >
+          <option value="">All Time</option>
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+        </select>
+      </div>
+
+      {/* Bulk Actions */}
+      {selectedItems.length > 0 && (
+        <div style={{ 
+          display: 'flex', 
+          gap: 16, 
+          marginBottom: 16, 
+          padding: 16, 
+          backgroundColor: '#f8f9fa', 
+          borderRadius: 8,
+          alignItems: 'center'
+        }}>
+          <span style={{ fontWeight: 'bold' }}>
+            {selectedItems.length} item(s) selected
+          </span>
+          <select 
+            value={bulkAction} 
+            onChange={e => setBulkAction(e.target.value)}
+            style={{ 
+              padding: 8, 
+              borderRadius: 4, 
+              border: '1px solid #e1e5e9',
+              fontSize: 14
+            }}
+          >
+            <option value="">Select Action</option>
+            {activeTab === 'flag' && (
+              <>
+                <option value="resolve">Resolve Selected</option>
+                <option value="dismiss">Dismiss Selected</option>
+                <option value="delete">Delete Selected</option>
+              </>
+            )}
+            {activeTab === 'trip' && (
+              <>
+                <option value="approve">Approve Selected</option>
+                <option value="suspend">Suspend Selected</option>
+                <option value="delete">Delete Selected</option>
+              </>
+            )}
+            {activeTab === 'user' && (
+              <>
+                <option value="ban">Ban Selected</option>
+                <option value="unban">Unban Selected</option>
+                <option value="warn">Warn Selected</option>
+                <option value="delete">Delete Selected</option>
+              </>
+            )}
+          </select>
+          <button 
+            onClick={handleBulkAction}
+            disabled={!bulkAction}
+            style={{ 
+              padding: '8px 16px',
+              backgroundColor: bulkAction ? '#007bff' : '#ccc',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: bulkAction ? 'pointer' : 'not-allowed',
+              fontSize: 14
+            }}
+          >
+            Apply
+          </button>
+          <button 
+            onClick={() => setSelectedItems([])}
+            style={{ 
+              padding: '8px 16px',
+              backgroundColor: '#666',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 14
+            }}
+          >
+            Clear Selection
+          </button>
+        </div>
+      )}
+
+      {/* Connection Status */}
+      <div style={{ 
+        marginBottom: 16, 
+        padding: 8, 
+        backgroundColor: isConnected ? '#d4edda' : '#f8d7da', 
+        color: isConnected ? '#155724' : '#721c24',
+        borderRadius: 4,
+        fontSize: 12,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8
+      }}>
+        <div style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          backgroundColor: isConnected ? '#28a745' : '#dc3545'
+        }} />
+        {isConnected ? 'Live updates active' : 'Offline mode'}
       </div>
 
       {/* Main Content */}
@@ -308,282 +1641,78 @@ export default function AdminReports() {
         <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>
       ) : error ? (
         <div style={{ color: '#d32f2f', padding: '1rem', textAlign: 'center' }}>
-          {error} <button onClick={() => fetchSummary(activeTab)}>Retry</button>
+          {error} <button onClick={() => fetchFlagData()}>Retry</button>
         </div>
-      ) : !summary ? (
-        <div style={{ color: '#888', fontSize: '1.1rem', padding: '2rem 0' }}>No data found.</div>
       ) : (
-        <div style={cardStyle}>
-          {/* Icon/Type Column */}
-          <div style={iconColStyle}>
-            <span style={{ fontSize: '2.7rem', marginBottom: 8 }}>{typeStyles[summary.reportType]?.icon}</span>
-            <span style={{ color: typeStyles[summary.reportType]?.color, fontWeight: 700, fontSize: '1.13rem', textAlign: 'center' }}>
-              {REPORT_TABS.find(t => t.key === summary.reportType)?.label}
-            </span>
-          </div>
-          {/* Summary Column */}
-          <div style={summaryColStyle}>
-            {summary.reportType === 'flag' && (
-              <>
-                <div style={sectionTitle}>Total Flags: <span style={{ color: '#222', fontWeight: 600 }}>{summary.totalFlags ?? '-'}</span></div>
-                <div style={{ marginBottom: 12 }}><span style={sectionTitle}>By Type:</span> <span style={labelStyle}>User:</span> {summary.byType?.user ?? '-'}, <span style={labelStyle}>Trip:</span> {summary.byType?.trip ?? '-'}, <span style={labelStyle}>Review:</span> {summary.byType?.review ?? '-'}</div>
-                <div style={sectionTitle}>Flagged Users:</div>
-                <ol style={listStyle}>
-                  {Array.isArray(summary.userFlags) && summary.userFlags.length > 0 ? summary.userFlags.map((f, i) => (
-                    <li key={f._id}><b>{i + 1}.</b> {f.targetName} <span style={labelStyle}>({f.targetEmail})</span> <b>- {f.count} flags</b> <span style={labelStyle}>Reason: {f.reason}</span> <button style={{ fontSize: 12, color: '#4e54c8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginLeft: 8 }} onClick={() => fetchFlagDetails('user', f._id, `Flags for ${f.targetName}`, { targetName: f.targetName, targetEmail: f.targetEmail, type: 'user', id: f._id })}>View Details</button></li>
-                  )) : <li style={labelStyle}>None</li>}
-                </ol>
-                <div style={sectionTitle}>Flagged Trips:</div>
-                <ol style={listStyle}>
-                  {Array.isArray(summary.tripFlags) && summary.tripFlags.length > 0 ? summary.tripFlags.map((f, i) => (
-                    <li key={f._id}><b>{i + 1}.</b> {f.targetDestination || 'Unknown'} <b>- {f.count} flags</b> <span style={labelStyle}>Reason: {f.reason}</span> <button style={{ fontSize: 12, color: '#4e54c8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginLeft: 8 }} onClick={() => fetchFlagDetails('trip', f._id, `Flags for ${f.targetDestination}`, { targetDestination: f.targetDestination, type: 'trip', id: f._id })}>View Details</button></li>
-                  )) : <li style={labelStyle}>None</li>}
-                </ol>
-                <div style={sectionTitle}>Flagged Reviews:</div>
-                <ol style={listStyle}>
-                  {Array.isArray(summary.reviewFlags) && summary.reviewFlags.length > 0 ? summary.reviewFlags.map((f, i) => (
-                    <li key={f._id}><b>{i + 1}.</b> <span style={{ fontStyle: 'italic' }}>{f.comment ? `"${f.comment}"` : 'No comment'}</span> <b>- {f.count} flags</b> <span style={labelStyle}>Reason: {f.reason}</span> <button style={{ fontSize: 12, color: '#4e54c8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginLeft: 8 }} onClick={() => fetchFlagDetails('review', f._id, `Flags for review: ${f.comment?.slice(0, 30)}`, { targetComment: f.comment, type: 'review', id: f._id })}>View Details</button></li>
-                  )) : <li style={labelStyle}>None</li>}
-                </ol>
-              </>
-            )}
-            {summary.reportType === 'trip' && (
-              <>
-                <div style={sectionTitle}>Total Trips: <span style={{ color: '#222', fontWeight: 600 }}>{summary.totalTrips ?? '-'}</span></div>
-                <div style={{ marginBottom: 12 }}><span style={sectionTitle}>By Type:</span> {summary.byType ? Object.entries(summary.byType).map(([type, count]) => <span key={type}><span style={labelStyle}>{type}:</span> {count} &nbsp;</span>) : '-'}</div>
-                <div style={sectionTitle}>Top 3 Destinations:</div>
-                <ol style={listStyle}>
-                  {Array.isArray(summary.topDestinations) && summary.topDestinations.length > 0 ? summary.topDestinations.map((d) => (
-                    <li key={d.destination}>{d.destination} <b>- {d.count} trips</b></li>
-                  )) : <li style={labelStyle}>None</li>}
-                </ol>
-              </>
-            )}
-            {summary.reportType === 'user' && (
-              <>
-                <div style={sectionTitle}>Total Users: <span style={{ color: '#222', fontWeight: 600 }}>{summary.totalUsers ?? '-'}</span></div>
-                <div style={sectionTitle}>New Users (Last 30 Days): <span style={{ color: '#222', fontWeight: 600 }}>{summary.newUsersLast30Days ?? '-'}</span></div>
-                <div style={sectionTitle}>Recent Signups:</div>
-                <ol style={listStyle}>
-                  {Array.isArray(summary.recentSignups) && summary.recentSignups.length > 0 ? summary.recentSignups.map((u) => (
-                    <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span></li>
-                  )) : <li style={labelStyle}>None</li>}
-                </ol>
-                <div style={sectionTitle}>Most Active Users:</div>
-                <ol style={listStyle}>
-                  {Array.isArray(summary.mostActive) && summary.mostActive.length > 0 ? summary.mostActive.map((u) => (
-                    <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span> <b>- {u.tripCount} trips</b></li>
-                  )) : <li style={labelStyle}>None</li>}
-                </ol>
-                <div style={sectionTitle}>Top 3 Creators:</div>
-                <ol style={listStyle}>
-                  {Array.isArray(summary.topCreators) && summary.topCreators.length > 0 ? summary.topCreators.map((u) => (
-                    <li key={u._id}>{u.name} <span style={labelStyle}>({u.email})</span> <b>- {u.count} trips</b></li>
-                  )) : <li style={labelStyle}>None</li>}
-                </ol>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* All Flags Table */}
-      {activeTab === 'flag' && (
         <>
-          <div style={{ marginTop: 32 }}>
-            <h2 style={{ color: '#4e54c8', fontWeight: 700, fontSize: '1.2rem', marginBottom: 10 }}>All Flag Submissions</h2>
+          {/* Flag Reports Table */}
+          {activeTab === 'flag' && (
             <AdminTable
               columns={flagColumns}
-              data={allFlags}
-              loading={flagsLoading}
+              data={filteredData}
+              loading={false}
               error={null}
-              page={flagsPage}
+              page={page}
               pageCount={pageCount}
-              onPageChange={setFlagsPage}
+              onPageChange={setPage}
               onSort={() => {}}
               sortKey={''}
               sortDirection={'asc'}
               actions={flagActions}
-              emptyMessage="No flags found."
+              emptyMessage="No flag reports found."
+              selectable={true}
+              selectedItems={selectedItems}
+              onSelectionChange={setSelectedItems}
             />
-          </div>
+          )}
 
-          {/* Resolved Flags Table */}
-          <div style={{ marginTop: 32 }}>
-            <h2 style={{ color: '#43a047', fontWeight: 700, fontSize: '1.1rem', marginBottom: 10 }}>Resolved Flags</h2>
+          {/* Trip Reports Table */}
+          {activeTab === 'trip' && (
             <AdminTable
-              columns={flagColumns}
-              data={resolvedFlags}
+              columns={tripColumns}
+              data={filteredData}
               loading={false}
               error={null}
-              page={1}
-              pageCount={1}
-              onPageChange={() => {}}
+              page={page}
+              pageCount={pageCount}
+              onPageChange={setPage}
               onSort={() => {}}
               sortKey={''}
               sortDirection={'asc'}
-              actions={null}
-              emptyMessage="No resolved flags."
+              actions={tripActions}
+              emptyMessage="No trip reports found."
+              selectable={true}
+              selectedItems={selectedItems}
+              onSelectionChange={setSelectedItems}
             />
-          </div>
+          )}
 
-          {/* Dismissed Flags Table */}
-          <div style={{ marginTop: 32 }}>
-            <h2 style={{ color: '#888', fontWeight: 700, fontSize: '1.1rem', marginBottom: 10 }}>Dismissed Flags</h2>
+          {/* User Reports Table */}
+          {activeTab === 'user' && (
             <AdminTable
-              columns={flagColumns}
-              data={dismissedFlags}
+              columns={userColumns}
+              data={filteredData}
               loading={false}
               error={null}
-              page={1}
-              pageCount={1}
-              onPageChange={() => {}}
+              page={page}
+              pageCount={pageCount}
+              onPageChange={setPage}
               onSort={() => {}}
               sortKey={''}
               sortDirection={'asc'}
-              actions={null}
-              emptyMessage="No dismissed flags."
+              actions={userActions}
+              emptyMessage="No user reports found."
+              selectable={true}
+              selectedItems={selectedItems}
+              onSelectionChange={setSelectedItems}
             />
-          </div>
+          )}
         </>
       )}
 
-      {/* Flag Details Modal */}
-      <AdminModal open={modalOpen} onClose={() => setModalOpen(false)} title={modalTitle}>
-        {modalError ? (
-          <div style={{ color: '#d32f2f', textAlign: 'center' }}>{modalError}</div>
-        ) : modalTarget && (
-          <div>
-            {/* Contextual Preview */}
-            {modalTarget?.type === 'user' && (
-              <div style={{ marginBottom: 10, color: '#222' }}>
-                {modalTarget.preferences && <div><b>Preferences:</b> {modalTarget.preferences}</div>}
-                {modalTarget.gender && <div><b>Gender:</b> {modalTarget.gender}</div>}
-              </div>
-            )}
-            {modalTarget?.type === 'trip' && (
-              <div style={{ marginBottom: 10, color: '#222' }}>
-                {modalTarget.targetDestination && <div><b>Destination:</b> {modalTarget.targetDestination}</div>}
-                {modalTarget.tripDate && <div><b>Date:</b> {modalTarget.tripDate}</div>}
-              </div>
-            )}
-            {modalTarget?.type === 'review' && (
-              <div style={{ marginBottom: 10, color: '#222' }}>
-                {modalTarget.targetComment && <div><b>Feedback:</b> {modalTarget.targetComment}</div>}
-                {modalTarget.rating && <div><b>Rating:</b> {modalTarget.rating}★</div>}
-                {modalTarget.tags && modalTarget.tags.length > 0 && <div><b>Tags:</b> {modalTarget.tags.join(', ')}</div>}
-              </div>
-            )}
-
-            {/* Flag Details */}
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ marginBottom: 8, color: '#4e54c8' }}>Flag Details</h3>
-              <div><b>Type:</b> {modalTarget.flagType}</div>
-              <div><b>Reason:</b> {modalTarget.reason}</div>
-              <div><b>Reporter:</b> {modalTarget.flaggedBy?.name || 'Unknown'} ({modalTarget.flaggedBy?.email || '-'})</div>
-              <div><b>Date:</b> {new Date(modalTarget.createdAt).toLocaleString()}</div>
-              {notificationCount > 0 && <div><b>Notifications Sent:</b> {notificationCount}</div>}
-            </div>
-
-            {/* All Flags for This Target */}
-            {modalFlags.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <h3 style={{ marginBottom: 8, color: '#4e54c8' }}>All Flags for This Target ({modalFlags.length})</h3>
-                <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #e1e5e9', borderRadius: 4, padding: 8 }}>
-                  {modalFlags.map((flag, index) => (
-                    <div key={flag._id} style={{ marginBottom: 8, padding: 8, backgroundColor: '#f8f9fa', borderRadius: 4 }}>
-                      <div><b>{index + 1}.</b> {flag.reason}</div>
-                      <div style={{ fontSize: '0.9rem', color: '#666' }}>
-                        By {flag.flaggedBy?.name || 'Unknown'} on {new Date(flag.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Moderation Actions */}
-            <div style={{ marginTop: 16 }}>
-              <h3 style={{ marginBottom: 8, color: '#4e54c8' }}>Moderation Actions</h3>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button 
-                  onClick={handleDismissFlag}
-                  style={{ 
-                    padding: '8px 16px', 
-                    backgroundColor: '#28a745', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: 4 
-                  }}
-                >
-                  ✅ Approve / Dismiss Flag
-                </button>
-                <button 
-                  onClick={handleDeleteTarget}
-                  style={{ 
-                    padding: '8px 16px', 
-                    backgroundColor: '#d32f2f', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: 4 
-                  }}
-                >
-                  🚫 Delete Content
-                </button>
-                {modalTarget.flagType === 'user' && (
-                  <button 
-                    onClick={handleBanUser}
-                    style={{ 
-                      padding: '8px 16px', 
-                      backgroundColor: '#ff9800', 
-                      color: 'white', 
-                      border: 'none', 
-                      borderRadius: 4 
-                    }}
-                  >
-                    🚷 Ban User
-                  </button>
-                )}
-                <button 
-                  onClick={handleEditTarget}
-                  style={{ 
-                    padding: '8px 16px', 
-                    backgroundColor: '#2196f3', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: 4 
-                  }}
-                >
-                  📝 Edit Content
-                </button>
-                <button 
-                  onClick={handleWarnUser}
-                  style={{ 
-                    padding: '8px 16px', 
-                    backgroundColor: '#ffc107', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: 4 
-                  }}
-                >
-                  👤 Warn User
-                </button>
-                <button 
-                  onClick={handleViewRelatedFlags}
-                  style={{ 
-                    padding: '8px 16px', 
-                    backgroundColor: '#9c27b0', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: 4 
-                  }}
-                >
-                  📂 View Related Flags
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Enhanced Modal */}
+      <AdminModal open={modalOpen} onClose={closeModal} title={`${modalType} Report Details`}>
+        {modalData && renderEnhancedModal(modalData, modalType)}
       </AdminModal>
     </AdminLayout>
   );

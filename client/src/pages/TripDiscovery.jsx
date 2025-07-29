@@ -108,118 +108,122 @@ export default function TripDiscovery() {
   }
 
   return (
-    <div className="trip-discovery-container">
-      {/* Header */}
-      <header className="discovery-header">
-        <div className="header-content">
-          <div className="header-text">
-            <h1>Discover Amazing Trips</h1>
-            <p>Find your next adventure and connect with fellow travelers</p>
+    <div className="dashboard-container">
+      {/* Welcome Section */}
+      <section className="dashboard-welcome">
+        <div className="welcome-content">
+          <div className="user-welcome">
+            <h1>Discover Amazing Trips 🧳</h1>
+            <p className="user-subtitle">
+              Find your next adventure and connect with fellow travelers
+            </p>
           </div>
-          <button 
-            className="create-trip-btn"
-            onClick={() => navigate('/trips/create')}
-          >
-            <span>➕</span>
-            Create Trip
-          </button>
         </div>
-      </header>
+      </section>
 
       {/* Search and Filters */}
-      <section className="search-filters">
-        <form onSubmit={handleSearch} className="search-form">
-          <div className="search-input-group">
-            <input
-              type="text"
-              placeholder="Search destinations, trip types..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            <button type="submit" className="search-btn">
-              🔍
-            </button>
-          </div>
-        </form>
-
-        <div className="filters-section">
-          <div className="filters-row">
-            <select
-              value={filters.tripType}
-              onChange={(e) => setFilters({...filters, tripType: e.target.value})}
-              className="filter-select"
-            >
-              <option value="">All Trip Types</option>
-              <option value="carpool">🚗 Carpool</option>
-              <option value="backpacking">🎒 Backpacking</option>
-              <option value="luxury">💎 Luxury</option>
-              <option value="adventure">🏔️ Adventure</option>
-              <option value="cultural">🏛️ Cultural</option>
-              <option value="beach">🏖️ Beach</option>
-            </select>
-
-            <select
-              value={filters.dateRange}
-              onChange={(e) => setFilters({...filters, dateRange: e.target.value})}
-              className="filter-select"
-            >
-              <option value="">Any Date</option>
-              <option value="this-week">This Week</option>
-              <option value="this-month">This Month</option>
-              <option value="next-month">Next Month</option>
-              <option value="next-3-months">Next 3 Months</option>
-            </select>
-
-            <select
-              value={filters.maxMembers}
-              onChange={(e) => setFilters({...filters, maxMembers: e.target.value})}
-              className="filter-select"
-            >
-              <option value="">Any Group Size</option>
-              <option value="2-4">2-4 People</option>
-              <option value="5-8">5-8 People</option>
-              <option value="9-15">9-15 People</option>
-              <option value="16+">16+ People</option>
-            </select>
-
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="filter-select"
-            >
-              <option value="date">Sort by Date</option>
-              <option value="destination">Sort by Destination</option>
-              <option value="members">Sort by Members</option>
-              <option value="created">Sort by Created</option>
-            </select>
-          </div>
-
-          <div className="filters-actions">
-            <button onClick={clearFilters} className="clear-filters-btn">
-              Clear Filters
-            </button>
-            <div className="view-toggle">
-              <button
-                className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                onClick={() => setViewMode('grid')}
-              >
-                ⊞
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h2>Search & Filters</h2>
+          <button 
+            className="view-all-btn"
+            onClick={clearFilters}
+          >
+            Clear Filters
+          </button>
+        </div>
+        
+        <div className="search-filters-container">
+          <form onSubmit={handleSearch} className="search-form">
+            <div className="search-input-group">
+              <input
+                type="text"
+                placeholder="Search destinations, trip types..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+              />
+              <button type="submit" className="search-btn">
+                🔍
               </button>
-              <button
-                className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
-                onClick={() => setViewMode('list')}
+            </div>
+          </form>
+
+          <div className="filters-section">
+            <div className="filters-row">
+              <select
+                value={filters.tripType}
+                onChange={(e) => setFilters({...filters, tripType: e.target.value})}
+                className="filter-select"
               >
-                ☰
-              </button>
+                <option value="">All Trip Types</option>
+                <option value="carpool">🚗 Carpool</option>
+                <option value="backpacking">🎒 Backpacking</option>
+                <option value="luxury">💎 Luxury</option>
+                <option value="adventure">🏔️ Adventure</option>
+                <option value="cultural">🏛️ Cultural</option>
+                <option value="beach">🏖️ Beach</option>
+              </select>
+
+              <select
+                value={filters.dateRange}
+                onChange={(e) => setFilters({...filters, dateRange: e.target.value})}
+                className="filter-select"
+              >
+                <option value="">Any Date</option>
+                <option value="this-week">This Week</option>
+                <option value="this-month">This Month</option>
+                <option value="next-month">Next Month</option>
+                <option value="next-3-months">Next 3 Months</option>
+              </select>
+
+              <select
+                value={filters.maxMembers}
+                onChange={(e) => setFilters({...filters, maxMembers: e.target.value})}
+                className="filter-select"
+              >
+                <option value="">Any Group Size</option>
+                <option value="2-4">2-4 People</option>
+                <option value="5-8">5-8 People</option>
+                <option value="9-15">9-15 People</option>
+                <option value="16+">16+ People</option>
+              </select>
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="filter-select"
+              >
+                <option value="date">Sort by Date</option>
+                <option value="destination">Sort by Destination</option>
+                <option value="members">Sort by Members</option>
+                <option value="created">Sort by Created</option>
+              </select>
+            </div>
+
+            <div className="filters-actions">
+              <div className="view-toggle">
+                <button
+                  className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                  onClick={() => setViewMode('grid')}
+                >
+                  ⊞
+                </button>
+                <button
+                  className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
+                  onClick={() => setViewMode('list')}
+                >
+                  ☰
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Results */}
-      <section className="results-section">
-        <div className="results-header">
+      <section className="dashboard-section">
+        <div className="section-header">
           <h2>
             {trips.length} {trips.length === 1 ? 'Trip' : 'Trips'} Found
           </h2>

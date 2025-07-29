@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-const accent = '#a78bfa';
-
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
@@ -33,58 +31,37 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #232336 0%, #3b2f63 50%, #232336 100%)',
-      }}
-    >
-      <div
-        className="signup-card-dark"
-        style={{
-          border: `2px solid ${accent}`,
-          borderRadius: 18,
-          boxShadow: `0 4px 32px 0 ${accent}22`,
-          maxWidth: 400,
-          width: '100%',
-          padding: 32,
-          background: 'rgba(30,32,40,0.98)'
-        }}
-      >
-        <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <span style={{ fontSize: 48, color: accent, display: 'inline-block', marginBottom: 8 }}>📧</span>
+    <div className="signup-bg-dark">
+      <div className="signup-card-dark">
+        <div className="text-center mb-4">
+          <span className="text-5xl text-purple-500 block mb-2">📧</span>
         </div>
-        <h2 className="signup-title" style={{ color: accent, textAlign: 'center', marginBottom: 8 }}>Forgot Password</h2>
-        <div style={{ height: 2, background: accent, opacity: 0.2, margin: '0 auto 18px auto', width: 60, borderRadius: 2 }} />
-        <p className="signup-desc" style={{ textAlign: 'center', color: '#bbb', marginBottom: 24 }}>Enter your email to receive a password reset link.</p>
+        <h2 className="signup-title text-center">Forgot Password</h2>
+        <div className="h-0.5 bg-purple-500 opacity-20 mx-auto mb-4 w-16 rounded"></div>
+        <p className="signup-desc text-center">Enter your email to receive a password reset link.</p>
         <form onSubmit={handleSubmit} className="signup-form">
           <div className="signup-field">
-            <label style={{ color: accent }}>Email</label>
+            <label>Email</label>
             <input
               type="email"
               placeholder="Enter your email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
-              style={{ borderColor: accent, color: '#fff', background: '#232336' }}
             />
           </div>
           <button
             className="signup-btn-dark"
             type="submit"
-            style={{ background: accent, color: '#232336', fontWeight: 600, marginTop: 8 }}
             disabled={loading}
           >
             {loading ? 'Sending...' : 'Send Reset Link'}
           </button>
         </form>
-        {message && <div style={{ color: accent, marginTop: 16, textAlign: 'center', fontWeight: 500 }}>{message}</div>}
-        {error && <div style={{ color: '#ef4444', marginTop: 16, textAlign: 'center', fontWeight: 500 }}>{error}</div>}
-        <div style={{ textAlign: 'center', marginTop: 18 }}>
-          <Link to="/login" style={{ color: accent, textDecoration: 'underline', fontSize: 15 }}>Back to Login</Link>
+        {message && <div className="text-purple-600 text-center mt-4 font-medium">{message}</div>}
+        {error && <div className="text-red-500 text-center mt-4 font-medium">{error}</div>}
+        <div className="text-center mt-4">
+          <Link to="/login" className="text-purple-500 underline text-sm">Back to Login</Link>
         </div>
       </div>
     </div>

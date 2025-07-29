@@ -20,7 +20,7 @@ const tripSchema = new mongoose.Schema({
     type: String, // carpool, rental, public transport
     required: true
   },
-  status: { type: String, enum: ['active', 'completed', 'cancelled'], default: 'active' },
+  status: { type: String, enum: ['active', 'completed', 'cancelled', 'suspended'], default: 'active' },
   description: { type: String, default: '' },
   images: [String],
   location: {
@@ -40,7 +40,13 @@ const tripSchema = new mongoose.Schema({
     paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   }],
   moderation: {
-    notificationCount: { type: Number, default: 0 }
+    notificationCount: { type: Number, default: 0 },
+    reported: { type: Boolean, default: false },
+    reportedAt: { type: Date },
+    reportReason: { type: String },
+    approvedAt: { type: Date },
+    suspendedAt: { type: Date },
+    completedAt: { type: Date }
   },
   createdAt: {
     type: Date,
