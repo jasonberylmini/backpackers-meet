@@ -78,20 +78,19 @@ export default function SidebarNavigation() {
 
       {/* Navigation Items */}
       <nav className="sidebar-nav">
-        <ul className="nav-list">
+        <div className="nav-list">
           {navigationItems.map((item) => (
-            <li key={item.path}>
-              <button
-                className={`nav-item ${isActive(item.path) ? 'active' : ''}`}
-                onClick={() => handleNavigation(item.path)}
-                title={isCollapsed ? item.label : ''}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                {!isCollapsed && <span className="nav-label">{item.label}</span>}
-              </button>
-            </li>
+            <button
+              key={item.path}
+              className={`nav-item ${isActive(item.path) ? 'active' : ''}`}
+              onClick={() => handleNavigation(item.path)}
+              title={isCollapsed ? item.label : ''}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              {!isCollapsed && <span className="nav-label">{item.label}</span>}
+            </button>
           ))}
-        </ul>
+        </div>
       </nav>
     </div>
   );

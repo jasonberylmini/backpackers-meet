@@ -77,10 +77,10 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="dashboard-container">
 
       {/* Welcome Section */}
-      <section className="bg-gray-50 border border-gray-200 rounded-2xl p-8 mb-8 shadow-sm">
+      <section className="dashboard-welcome">
         <div className="max-w-6xl mx-auto">
           <div className="text-center">
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome back, {user.name}! 👋</h1>
@@ -97,50 +97,50 @@ export default function Dashboard() {
       </section>
 
       {/* Stats Cards */}
-      <section className="mb-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="text-3xl mb-3">🧳</div>
+      <section className="dashboard-stats">
+        <div className="stats-grid">
+          <div className="stat-card stat-card-blue">
+            <div className="stat-icon">🧳</div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">{stats?.totalTrips || 0}</h3>
-              <p className="text-gray-600">Total Trips</p>
+              <h3 className="stat-number">{stats?.totalTrips || 0}</h3>
+              <p className="stat-label">Total Trips</p>
             </div>
           </div>
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="text-3xl mb-3">✅</div>
+          <div className="stat-card stat-card-green">
+            <div className="stat-icon">✅</div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">{stats?.completedTrips || 0}</h3>
-              <p className="text-gray-600">Completed</p>
+              <h3 className="stat-number">{stats?.completedTrips || 0}</h3>
+              <p className="stat-label">Completed</p>
             </div>
           </div>
-          <div className="bg-purple-50 border border-purple-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="text-3xl mb-3">📅</div>
+          <div className="stat-card stat-card-purple">
+            <div className="stat-icon">📅</div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">{stats?.upcomingTrips || 0}</h3>
-              <p className="text-gray-600">Upcoming</p>
+              <h3 className="stat-number">{stats?.upcomingTrips || 0}</h3>
+              <p className="stat-label">Upcoming</p>
             </div>
           </div>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="text-3xl mb-3">💰</div>
+          <div className="stat-card stat-card-yellow">
+            <div className="stat-icon">💰</div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">₹{stats?.totalExpenses || 0}</h3>
-              <p className="text-gray-600">Total Spent</p>
+              <h3 className="stat-number">₹{stats?.totalExpenses || 0}</h3>
+              <p className="stat-label">Total Spent</p>
             </div>
           </div>
-          <div className="bg-pink-50 border border-pink-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="text-3xl mb-3">⭐</div>
+          <div className="stat-card stat-card-pink">
+            <div className="stat-icon">⭐</div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">{stats?.totalReviews || 0}</h3>
-              <p className="text-gray-600">Reviews Given</p>
+              <h3 className="stat-number">{stats?.totalReviews || 0}</h3>
+              <p className="stat-label">Reviews Given</p>
             </div>
           </div>
-          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="text-3xl mb-3">
+          <div className="stat-card stat-card-orange">
+            <div className="stat-icon">
               {stats?.verificationStatus === 'verified' ? '✅' : '⏳'}
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">{stats?.verificationStatus === 'verified' ? 'Verified' : 'Pending'}</h3>
-              <p className="text-gray-600">KYC Status</p>
+              <h3 className="stat-number">{stats?.verificationStatus === 'verified' ? 'Verified' : 'Pending'}</h3>
+              <p className="stat-label">KYC Status</p>
             </div>
           </div>
         </div>
@@ -149,41 +149,37 @@ export default function Dashboard() {
 
 
       {/* Recent Trips */}
-      <section className="mb-16">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Recent Trips</h2>
+      <section className="recent-trips-section">
+        <div className="section-header">
+          <h2 className="section-title">Recent Trips</h2>
           <button 
             className="btn btn-secondary"
-            onClick={() => navigate('/trips')}
+            onClick={() => navigate('/trips/browse')}
           >
             View All
           </button>
         </div>
         {recentTrips.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="trips-grid">
             {recentTrips.slice(0, 3).map(trip => (
-              <div key={trip._id} className="card overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="h-48 overflow-hidden">
+              <div key={trip._id} className="trip-card">
+                <div className="trip-image-container">
                   <img 
                     src={trip.image || 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300&h=200&fit=crop'} 
                     alt={trip.destination}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                    className="trip-image"
                   />
                 </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">{trip.destination}</h3>
-                  <p className="text-gray-600 mb-2">
+                <div className="trip-content">
+                  <h3 className="trip-title">{trip.destination}</h3>
+                  <p className="trip-date">
                     {new Date(trip.startDate || trip.date).toLocaleDateString()}
                   </p>
-                  <p className="text-gray-600 mb-3">
+                  <p className="trip-members">
                     {trip.members?.length || 0} members
                   </p>
-                  <div className="flex justify-between items-center">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      (trip.status || 'upcoming') === 'upcoming' ? 'bg-blue-100 text-blue-800' :
-                      (trip.status || 'upcoming') === 'active' ? 'bg-green-100 text-green-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
+                  <div className="trip-status-container">
+                    <span className={`trip-status trip-status-${trip.status || 'upcoming'}`}>
                       {trip.status || 'Upcoming'}
                     </span>
                   </div>
@@ -192,10 +188,10 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <div className="card p-12 text-center">
-            <div className="text-6xl mb-6 text-gray-400">🧳</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No trips yet</h3>
-            <p className="text-gray-600 mb-6">Start your journey by creating your first trip!</p>
+          <div className="empty-state">
+            <div className="empty-icon">🧳</div>
+            <h3 className="empty-title">No trips yet</h3>
+            <p className="empty-description">Start your journey by creating your first trip!</p>
             <button 
               className="btn btn-primary"
               onClick={() => navigate('/trips/create')}
@@ -207,9 +203,9 @@ export default function Dashboard() {
       </section>
 
       {/* Recent Activity */}
-      <section className="mb-16">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Recent Activity</h2>
+      <section className="recent-activity-section">
+        <div className="section-header">
+          <h2 className="section-title">Recent Activity</h2>
           <button 
             className="btn btn-secondary"
             onClick={() => navigate('/activity')}
@@ -218,18 +214,18 @@ export default function Dashboard() {
           </button>
         </div>
         {recentActivity.length > 0 ? (
-          <div className="card p-6">
+          <div className="activity-card">
             {recentActivity.slice(0, 5).map((activity, index) => (
-              <div key={index} className="flex items-start space-x-4 py-4 border-b border-gray-100 last:border-b-0">
-                <div className="text-2xl">
+              <div key={index} className="activity-item">
+                <div className="activity-icon">
                   {activity.type === 'trip' && '🧳'}
                   {activity.type === 'review' && '⭐'}
                   {activity.type === 'expense' && '💰'}
                   {activity.type === 'message' && '💬'}
                 </div>
-                <div className="flex-1">
-                  <p className="text-gray-900 mb-1">{activity.description}</p>
-                  <span className="text-sm text-gray-500">
+                <div className="activity-content">
+                  <p className="activity-description">{activity.description}</p>
+                  <span className="activity-timestamp">
                     {new Date(activity.timestamp).toLocaleDateString()}
                   </span>
                 </div>
@@ -237,25 +233,25 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <div className="card p-12 text-center">
-            <div className="text-6xl mb-6 text-gray-400">📝</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No recent activity</h3>
-            <p className="text-gray-600">Your activity will appear here as you use the platform</p>
+          <div className="empty-state">
+            <div className="empty-icon">📝</div>
+            <h3 className="empty-title">No recent activity</h3>
+            <p className="empty-description">Your activity will appear here as you use the platform</p>
           </div>
         )}
       </section>
 
       {/* Verification Reminder */}
       {stats?.verificationStatus !== 'verified' && (
-        <section className="mb-16">
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center space-x-6">
-              <div className="bg-amber-500 text-white text-2xl w-16 h-16 rounded-xl flex items-center justify-center">
+        <section className="verification-section">
+          <div className="verification-card">
+            <div className="verification-content">
+              <div className="verification-icon">
                 📋
               </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-bold text-amber-900 mb-2">Complete Your Verification</h3>
-                <p className="text-amber-800 mb-4">Verify your account to unlock all features and build trust with other travelers.</p>
+              <div className="verification-text">
+                <h3 className="verification-title">Complete Your Verification</h3>
+                <p className="verification-description">Verify your account to unlock all features and build trust with other travelers.</p>
                 <button 
                   className="btn btn-success"
                   onClick={() => navigate('/kyc')}
