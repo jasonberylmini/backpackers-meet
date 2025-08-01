@@ -18,6 +18,8 @@ import flagRoutes from './routes/flagRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js';
 import postRoutes from './routes/postRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import User from './models/User.js'; // Added for /test-user-profile endpoint
+import verifyToken from './middlewares/authMiddleware.js'; // Added for /test-user-profile endpoint
 
 dotenv.config();
 // Environment variable checks
@@ -71,6 +73,55 @@ app.use('/api/notifications', notificationRoutes);
 // Test route
 app.get('/', (req, res) => {
   res.send('🚀 Server is running!');
+});
+
+// Test uploads directory
+app.get('/test-uploads', (req, res) => {
+  try {
+    const uploadsPath = path.resolve('uploads');
+    const files = fs.readdirSync(uploadsPath);
+    res.json({
+      message: 'Uploads directory is accessible',
+      path: uploadsPath,
+      files: files,
+      fileCount: files.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error accessing uploads directory',
+      error: error.message
+    });
+  }
+});
+
+// Test current user profile data
+app.get('/test-user-profile', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('-passwordHash');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json({
+      message: 'Current user profile data',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImage: user.profileImage,
+        coverImage: user.coverImage,
+        profileImageType: typeof user.profileImage,
+        coverImageType: typeof user.coverImage,
+        profileImageTruthy: !!user.profileImage,
+        coverImageTruthy: !!user.coverImage
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching user profile',
+      error: error.message
+    });
+  }
 });
 
 // --- SOCKET.IO INTEGRATION ---

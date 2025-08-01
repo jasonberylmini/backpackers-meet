@@ -9,6 +9,8 @@ import TripDiscovery from './pages/TripDiscovery';
 import TripCreation from './pages/TripCreation';
 import TripDetails from './pages/TripDetails';
 import UserProfile from './pages/UserProfile';
+import ProfileView from './pages/ProfileView';
+import FriendProfile from './pages/FriendProfile';
 import Expenses from './pages/Expenses';
 import SocialFeed from './pages/SocialFeed';
 import Messages from './pages/Messages';
@@ -99,7 +101,21 @@ function AppRoutes() {
         <Route path="/profile" element={
           <ProtectedRoute>
             <UserLayout>
+              <ProfileView />
+            </UserLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/profile/edit" element={
+          <ProtectedRoute>
+            <UserLayout>
               <UserProfile />
+            </UserLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/profile/:friendId" element={
+          <ProtectedRoute>
+            <UserLayout>
+              <FriendProfile />
             </UserLayout>
           </ProtectedRoute>
         } />

@@ -17,7 +17,7 @@ const RealTimeExpense = ({ tripId, currentUser }) => {
 
     const handleNewExpense = (data) => {
       setExpenses(prev => [...prev, data.expense]);
-      toast(`${data.addedBy.name} added expense: ${data.expense.description}`, {
+      toast(`${data.addedBy.username || data.addedBy.name || 'Unknown'} added expense: ${data.expense.description}`, {
         duration: 4000,
         position: 'top-right',
         icon: '💰',
@@ -30,7 +30,7 @@ const RealTimeExpense = ({ tripId, currentUser }) => {
           ? { ...exp, status: 'settled' }
           : exp
       ));
-      toast(`${data.settledBy.name} settled an expense`, {
+      toast(`${data.settledBy.username || data.settledBy.name || 'Unknown'} settled an expense`, {
         duration: 3000,
         position: 'top-right',
         icon: '✅',
@@ -257,7 +257,7 @@ const RealTimeExpense = ({ tripId, currentUser }) => {
                       {expense.currency} {expense.amount.toFixed(2)}
                     </div>
                     <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                      by {expense.contributorId?.name || 'Unknown'}
+                      by {expense.contributorId?.username || expense.contributorId?.name || 'Unknown'}
                     </div>
                   </div>
                 </div>

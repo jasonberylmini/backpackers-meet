@@ -14,21 +14,48 @@ export const createTrip = async (req, res) => {
     if (!user || user.verificationStatus !== 'verified') {
       return res.status(403).json({ message: 'KYC verification required to create trips.' });
     }
-    const { destination, startDate, endDate, budget, tripType, description } = req.body;
+    
+    const { destination, startDate, endDate, budget, tripType, description, maxMembers, privacy } = req.body;
+    
     if (!destination || !startDate || !endDate || !budget || !tripType) {
       return res.status(400).json({ message: "All fields (destination, startDate, endDate, budget, tripType) are required." });
     }
-    const newTrip = new Trip({
+
+    // Handle image upload
+    let images = [];
+    if (req.file) {
+      // If using multer for file upload - store the full path
+      const imagePath = `/uploads/${req.file.filename}`;
+      images.push(imagePath);
+    } else if (req.body.image) {
+      // If image is sent as base64 or URL
+      images.push(req.body.image);
+    }
+
+    const tripData = {
       creator: req.user.userId,
       destination,
       startDate,
       endDate,
-      budget,
+      budget: parseInt(budget),
       tripType,
-      description,
-      members: [req.user.userId]
-    });
+      description: description || '',
+      members: [], // Don't add creator to members array - they're already the creator
+      images,
+      privacy: privacy || 'public'
+    };
+
+    // Add maxMembers if provided
+    if (maxMembers && parseInt(maxMembers) > 0) {
+      tripData.maxMembers = parseInt(maxMembers);
+    }
+
+    const newTrip = new Trip(tripData);
     await newTrip.save();
+    
+    // Populate the creator field for the response
+    await newTrip.populate('creator', 'name email');
+    
     res.status(201).json({
       message: "Trip created successfully!",
       trip: newTrip
@@ -46,11 +73,33 @@ export const getMyTrips = async (req, res) => {
         { creator: req.user.userId },
         { members: req.user.userId }
       ]
-    }).populate('creator', 'name email').select('creator destination date budget tripType members createdAt');
+    })
+    .populate('creator', 'name email')
+    .populate('members', 'name')
+    .select('creator destination startDate endDate budget tripType description images members maxMembers createdAt');
 
     res.status(200).json(myTrips);
   } catch (err) {
     logger.error("Fetch trips error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getTripById = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    
+    const trip = await Trip.findById(tripId)
+      .populate('creator', 'name email')
+      .populate('members', 'name email');
+    
+    if (!trip) {
+      return res.status(404).json({ message: 'Trip not found' });
+    }
+    
+    res.status(200).json(trip);
+  } catch (err) {
+    logger.error("Get trip by ID error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -110,7 +159,11 @@ export const browseTrips = async (req, res) => {
     if (destination) filter.destination = new RegExp(destination, 'i');
     if (tripType) filter.tripType = tripType;
 
-    const trips = await Trip.find(filter).populate('creator', 'name').select('creator destination date budget tripType members createdAt');
+    const trips = await Trip.find(filter)
+      .populate('creator', 'name')
+      .populate('members', 'name')
+      .select('creator destination startDate endDate budget tripType description images members maxMembers createdAt');
+    
     res.status(200).json(trips);
   } catch (err) {
     logger.error("Browse trips error:", err);

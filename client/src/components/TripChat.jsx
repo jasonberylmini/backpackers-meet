@@ -258,7 +258,7 @@ const TripChat = ({ tripId, tripName, user, tripDetails }) => {
                       gap: '8px',
                       color: msg.sender?.id === user?.userId ? '#1e40af' : '#4b5563',
                     }}>
-                      {msg.sender?.name || 'Unknown'}
+                      {msg.sender?.username || msg.sender?.name || 'Unknown'}
                       {msg.sender?.role === 'organizer' && (
                         <span style={{
                           background: '#dcfce7',
@@ -300,7 +300,7 @@ const TripChat = ({ tripId, tripName, user, tripDetails }) => {
               backgroundColor: '#f8f9fa',
               borderTop: '1px solid #e1e5e9'
             }}>
-              {typingUsers.map(u => u.name).join(', ')} typing...
+              {typingUsers.map(u => u.username || u.name || 'Unknown').join(', ')} typing...
             </div>
           )}
         </div>
@@ -418,7 +418,7 @@ const TripChat = ({ tripId, tripName, user, tripDetails }) => {
             backgroundColor: '#f8f9fa',
             borderTop: '1px solid #e1e5e9'
           }}>
-            Online: {onlineUsers.map(u => u.name).join(', ')}
+            Online: {onlineUsers.map(u => u.username || u.name || 'Unknown').join(', ')}
           </div>
         )}
       </div>

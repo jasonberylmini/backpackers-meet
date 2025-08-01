@@ -6,7 +6,9 @@ import {
   sendMessage,
   getChatMessages,
   markMessagesAsRead,
-  deleteMessage
+  editMessage,
+  deleteMessage,
+  deleteChat
 } from '../controllers/chatController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 
@@ -21,6 +23,10 @@ router.get('/user-chats', verifyToken, getUserChats);
 router.post('/:chatId/messages', verifyToken, sendMessage);
 router.get('/:chatId/messages', verifyToken, getChatMessages);
 router.patch('/:chatId/messages/read', verifyToken, markMessagesAsRead);
+router.patch('/messages/:messageId', verifyToken, editMessage);
 router.delete('/messages/:messageId', verifyToken, deleteMessage);
+
+// Chat management
+router.delete('/:chatId', verifyToken, deleteChat);
 
 export default router;

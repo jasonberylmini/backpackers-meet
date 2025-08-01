@@ -159,7 +159,12 @@ export default function KYCVerification() {
         <div className="header-content">
           <div className="header-text">
             <h1>KYC Verification</h1>
-            <p>Verify your identity to unlock all platform features</p>
+            <p>
+              {user.verificationStatus === 'verified' 
+                ? 'Your identity has been verified successfully' 
+                : 'Verify your identity to unlock all platform features'
+              }
+            </p>
           </div>
           <button 
             className="back-btn"
@@ -170,32 +175,34 @@ export default function KYCVerification() {
         </div>
       </header>
 
-      {/* Status Section */}
-      <section className="kyc-status">
-        <div className="status-card">
-          <div className="status-header">
-            <div 
-              className="status-badge"
-              style={{ 
-                backgroundColor: getStatusColor(user.verificationStatus).bg,
-                color: getStatusColor(user.verificationStatus).text
-              }}
-            >
-              <span className="status-icon">
-                {getStatusColor(user.verificationStatus).icon}
-              </span>
-              <span className="status-text">
-                {user.verificationStatus === 'verified' ? 'Verified' : 
-                 user.verificationStatus === 'pending' ? 'Under Review' :
-                 user.verificationStatus === 'rejected' ? 'Rejected' : 'Not Verified'}
-              </span>
+      {/* Status Section - Only show for non-verified users */}
+      {user.verificationStatus !== 'verified' && (
+        <section className="kyc-status">
+          <div className="status-card">
+            <div className="status-header">
+              <div 
+                className="status-badge"
+                style={{ 
+                  backgroundColor: getStatusColor(user.verificationStatus).bg,
+                  color: getStatusColor(user.verificationStatus).text
+                }}
+              >
+                <span className="status-icon">
+                  {getStatusColor(user.verificationStatus).icon}
+                </span>
+                <span className="status-text">
+                  {user.verificationStatus === 'verified' ? 'Verified' : 
+                   user.verificationStatus === 'pending' ? 'Under Review' :
+                   user.verificationStatus === 'rejected' ? 'Rejected' : 'Not Verified'}
+                </span>
+              </div>
             </div>
+            <p className="status-message">
+              {getStatusMessage(user.verificationStatus)}
+            </p>
           </div>
-          <p className="status-message">
-            {getStatusMessage(user.verificationStatus)}
-          </p>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Verification Form */}
       {user.verificationStatus !== 'verified' && (
@@ -325,14 +332,14 @@ export default function KYCVerification() {
           <div className="success-card">
             <div className="success-icon">✅</div>
             <h2>Verification Complete!</h2>
-            <p>Your account has been successfully verified. You now have access to all platform features.</p>
+            <p>Your account has been successfully verified.</p>
             <div className="success-benefits">
-              <h3>What you can do now:</h3>
+              <h3>Unlocked Features:</h3>
               <ul>
-                <li>✅ Create and join trips</li>
-                <li>✅ Access all chat features</li>
-                <li>✅ Use expense tracking</li>
-                <li>✅ Build trust with other travelers</li>
+                <li>Create and join trips</li>
+                <li>Access all chat features</li>
+                <li>Use expense tracking</li>
+                <li>Build trust with other travelers</li>
               </ul>
             </div>
             <button 

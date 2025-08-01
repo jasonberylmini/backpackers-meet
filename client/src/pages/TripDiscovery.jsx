@@ -96,6 +96,25 @@ export default function TripDiscovery() {
     return ranges[value] || value;
   };
 
+  const getTripImage = (trip) => {
+    if (trip.images && trip.images.length > 0) {
+      // If it's a relative path, prepend the server URL
+      const imagePath = trip.images[0];
+      if (imagePath.startsWith('/uploads/')) {
+        return `http://localhost:5000${imagePath}`;
+      }
+      return imagePath;
+    }
+    return 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400&h=250&fit=crop';
+  };
+
+  const getTotalMembers = (trip) => {
+    if (!trip) return 0;
+    // Count members + creator (if creator is not in members array)
+    const creatorInMembers = trip.members.some(member => member._id === trip.creator._id);
+    return trip.members.length + (creatorInMembers ? 0 : 1);
+  };
+
   if (loading) {
     return (
       <div className="trip-discovery-container">
@@ -227,25 +246,33 @@ export default function TripDiscovery() {
           <h2>
             {trips.length} {trips.length === 1 ? 'Trip' : 'Trips'} Found
           </h2>
-          {Object.values(filters).some(f => f) && (
-            <div className="active-filters">
-              {filters.tripType && (
-                <span className="filter-tag">
-                  {filters.tripType} ✕
-                </span>
-              )}
-              {filters.dateRange && (
-                <span className="filter-tag">
-                  {getDateRangeLabel(filters.dateRange)} ✕
-                </span>
-              )}
-              {filters.maxMembers && (
-                <span className="filter-tag">
-                  {filters.maxMembers} ✕
-                </span>
-              )}
-            </div>
-          )}
+          <div className="section-actions">
+            <button 
+              className="create-trip-btn"
+              onClick={() => navigate('/trips/create')}
+            >
+              ✨ Create Trip
+            </button>
+            {Object.values(filters).some(f => f) && (
+              <div className="active-filters">
+                {filters.tripType && (
+                  <span className="filter-tag">
+                    {filters.tripType} ✕
+                  </span>
+                )}
+                {filters.dateRange && (
+                  <span className="filter-tag">
+                    {getDateRangeLabel(filters.dateRange)} ✕
+                  </span>
+                )}
+                {filters.maxMembers && (
+                  <span className="filter-tag">
+                    {filters.maxMembers} ✕
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {trips.length === 0 ? (
@@ -266,7 +293,7 @@ export default function TripDiscovery() {
               <div key={trip._id} className={`trip-card ${viewMode}`}>
                 <div className="trip-image">
                   <img 
-                    src={trip.image || 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400&h=250&fit=crop'} 
+                    src={getTripImage(trip)} 
                     alt={trip.destination}
                   />
                   <div className="trip-overlay">
@@ -301,11 +328,11 @@ export default function TripDiscovery() {
                     </div>
                     <div className="detail-item">
                       <span className="detail-icon">👥</span>
-                      <span>{trip.members?.length || 0}/{trip.maxMembers || '∞'} members</span>
+                      <span>{getTotalMembers(trip)}/{trip.maxMembers || '∞'} members</span>
                     </div>
                     <div className="detail-item">
                       <span className="detail-icon">👤</span>
-                      <span>{trip.creator?.name || 'Unknown'}</span>
+                      <span>{trip.creator?.username || trip.creator?.name || 'Unknown'}</span>
                     </div>
                   </div>
 
@@ -313,9 +340,9 @@ export default function TripDiscovery() {
                     <button 
                       className="join-btn"
                       onClick={() => handleJoinTrip(trip._id)}
-                      disabled={trip.members?.length >= (trip.maxMembers || Infinity)}
+                      disabled={getTotalMembers(trip) >= (trip.maxMembers || Infinity)}
                     >
-                      {trip.members?.length >= (trip.maxMembers || Infinity) ? 'Full' : 'Join Trip'}
+                      {getTotalMembers(trip) >= (trip.maxMembers || Infinity) ? 'Full' : 'Join Trip'}
                     </button>
                     <button 
                       className="view-details-btn"

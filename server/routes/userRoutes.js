@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser, updateProfile, getUnverifiedUsers, verifyUser, forgotPassword, resetPassword, validateResetToken, setUserStatus, getUserById, blockUser, unblockUser, getBlockedUsers } from '../controllers/userController.js';
+import { registerUser, loginUser, getProfile, updateProfile, getUnverifiedUsers, verifyUser, forgotPassword, resetPassword, validateResetToken, setUserStatus, getUserById, blockUser, unblockUser, getBlockedUsers } from '../controllers/userController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 import isAdmin from '../middlewares/isAdmin.js';
 import upload from '../middlewares/upload.js';
@@ -43,6 +43,7 @@ router.post('/reset-password', resetPassword);
 router.post('/validate-reset-token', validateResetToken);
 
 // Protected routes
+router.get('/profile', verifyToken, getProfile);
 router.put('/profile', verifyToken, upload.fields([
   { name: 'profileImage', maxCount: 1 },
   { name: 'coverImage', maxCount: 1 },

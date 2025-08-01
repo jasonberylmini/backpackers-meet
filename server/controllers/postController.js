@@ -84,6 +84,7 @@ export const getAllPosts = async (req, res) => {
   try {
     const { audience } = req.query;
     let filter = {};
+    
     if (audience === 'nearby') {
       const user = await User.findById(req.user.userId);
       if (!user || !user.country) {
@@ -93,9 +94,18 @@ export const getAllPosts = async (req, res) => {
     } else if (audience === 'worldwide') {
       filter = { audience: 'worldwide' };
     }
+    
     const posts = await Post.find(filter)
       .populate('author', 'name profileImage country')
+      .populate({
+        path: 'comments',
+        populate: {
+          path: 'author',
+          select: 'name profileImage country'
+        }
+      })
       .sort({ createdAt: -1 });
+      
     res.status(200).json(posts);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -107,9 +117,66 @@ export const getUserPosts = async (req, res) => {
     const { userId } = req.params;
     const posts = await Post.find({ author: userId })
       .populate('author', 'name profileImage country')
+      .populate({
+        path: 'comments',
+        populate: {
+          path: 'author',
+          select: 'name profileImage country'
+        }
+      })
       .sort({ createdAt: -1 });
     res.status(200).json(posts);
   } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const getFeed = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    // Get worldwide posts
+    const worldwidePosts = await Post.find({ audience: 'worldwide' })
+      .populate('author', 'name profileImage country')
+      .populate({
+        path: 'comments',
+        populate: {
+          path: 'author',
+          select: 'name profileImage country'
+        }
+      })
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    // Get nearby posts if user has country set
+    let nearbyPosts = [];
+    if (user.country) {
+      nearbyPosts = await Post.find({ 
+        audience: 'nearby', 
+        country: user.country 
+      })
+        .populate('author', 'name profileImage country')
+        .populate({
+          path: 'comments',
+          populate: {
+            path: 'author',
+            select: 'name profileImage country'
+          }
+        })
+        .sort({ createdAt: -1 })
+        .limit(10);
+    }
+
+    // Combine and sort by creation date
+    const allPosts = [...worldwidePosts, ...nearbyPosts];
+    allPosts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.status(200).json(allPosts);
+  } catch (err) {
+    console.error('Feed error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -159,7 +226,7 @@ export const addComment = async (req, res) => {
     post.comments.push(comment._id);
     await post.save();
     await comment.populate('author', 'name profileImage country');
-    res.status(201).json({ message: 'Comment added!', comment });
+    res.status(201).json(comment);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -233,6 +300,30 @@ export const reportPost = async (req, res) => {
     });
     await flag.save();
     res.status(201).json({ message: 'Post reported.', flag });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const reportComment = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { reason } = req.body;
+    if (!reason) return res.status(400).json({ message: 'Reason is required.' });
+    const user = await User.findById(req.user.userId);
+    if (!user || user.verificationStatus !== 'verified') {
+      return res.status(403).json({ message: 'KYC verification required to report.' });
+    }
+    const comment = await Comment.findById(commentId);
+    if (!comment) return res.status(404).json({ message: 'Comment not found.' });
+    const flag = new Flag({
+      flaggedBy: req.user.userId,
+      flagType: 'comment',
+      targetId: commentId,
+      reason
+    });
+    await flag.save();
+    res.status(201).json({ message: 'Comment reported.', flag });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }

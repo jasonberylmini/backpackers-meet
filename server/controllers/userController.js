@@ -6,6 +6,7 @@ import { validationResult } from 'express-validator';
 import winston from 'winston';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import { generateUniqueUsername } from '../utils/usernameGenerator.js';
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()]
@@ -23,8 +24,12 @@ export const registerUser = async (req, res) => {
     if (userExists) {
       return res.status(409).json({ message: "Email already registered." });
     }
+    
+    // Generate a unique username from the user's name
+    const username = await generateUniqueUsername(name);
+    
     const passwordHash = await bcrypt.hash(password, 10);
-    const newUser = new User({ name, email, passwordHash });
+    const newUser = new User({ name, email, passwordHash, username });
     await newUser.save();
     res.status(201).json({ message: "User registered successfully!" });
   } catch (err) {
@@ -70,6 +75,7 @@ export const loginUser = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        username: user.username,
         role: user.role,
         verificationStatus: user.verificationStatus,
         createdAt: user.createdAt,
@@ -87,34 +93,78 @@ export const loginUser = async (req, res) => {
   }
 };
 
-// 3. Update profile: allow bio, notificationPrefs, dateOfBirth, username, country, instagram, languages, coverImage
-export const updateProfile = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+// 3. Get profile: return current user's profile data
+export const getProfile = async (req, res) => {
   try {
-    const { phone, gender, preferences, bio, notificationPrefs, dateOfBirth, username, country, instagram, languages, coverImage } = req.body;
+    const userId = req.user.userId;
+    const user = await User.findById(userId).select('-passwordHash');
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    res.status(200).json(user);
+  } catch (err) {
+    logger.error("Get Profile Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// 4. Update profile: allow bio, notificationPrefs, dateOfBirth, username, country, instagram, languages, coverImage
+export const updateProfile = async (req, res) => {
+  try {
+    const { phone, gender, preferences, bio, notificationPrefs, dateOfBirth, username, country, instagram, languages } = req.body;
     const idDocument = req.files?.idDocument?.[0]?.path;
     const idSelfie = req.files?.idSelfie?.[0]?.path;
     const profileImage = req.files?.profileImage?.[0]?.path;
     const coverImageFile = req.files?.coverImage?.[0]?.path;
+    
     const user = await User.findById(req.user.userId);
-    let updateFields = { phone, gender, preferences };
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    let updateFields = {};
+    
+    // Handle text fields
+    if (phone !== undefined) updateFields.phone = phone;
+    if (gender !== undefined) updateFields.gender = gender;
+    if (preferences !== undefined) updateFields.preferences = preferences;
     if (bio !== undefined) updateFields.bio = bio;
-    if (notificationPrefs !== undefined) updateFields.notificationPrefs = notificationPrefs;
+    if (notificationPrefs !== undefined) {
+      try {
+        updateFields.notificationPrefs = JSON.parse(notificationPrefs);
+      } catch (e) {
+        updateFields.notificationPrefs = notificationPrefs;
+      }
+    }
     if (dateOfBirth !== undefined) updateFields.dateOfBirth = dateOfBirth;
-    if (username !== undefined) updateFields.username = username;
+    if (username !== undefined) {
+      // Check if username is already taken by another user
+      const existingUser = await User.findOne({ username, _id: { $ne: req.user.userId } });
+      if (existingUser) {
+        return res.status(409).json({ message: "Username is already taken." });
+      }
+      updateFields.username = username;
+    }
     if (country !== undefined) updateFields.country = country;
     if (instagram !== undefined) updateFields.instagram = instagram;
     if (languages !== undefined) updateFields.languages = languages;
+    
+    // Handle file uploads
     if (profileImage) {
-      updateFields.profileImage = profileImage;
+      // Handle both forward and backward slashes for cross-platform compatibility
+      const profileFilename = profileImage.split(/[/\\]/).pop(); // Store just the filename
+      updateFields.profileImage = profileFilename;
+      console.log('Saving profileImage:', updateFields.profileImage);
+      console.log('Original profileImage path:', profileImage);
     }
     if (coverImageFile) {
-      updateFields.coverImage = coverImageFile;
-    } else if (coverImage !== undefined) {
-      updateFields.coverImage = coverImage;
+      // Handle both forward and backward slashes for cross-platform compatibility
+      const coverFilename = coverImageFile.split(/[/\\]/).pop(); // Store just the filename
+      updateFields.coverImage = coverFilename;
+      console.log('Saving coverImage:', updateFields.coverImage);
+      console.log('Original coverImage path:', coverImageFile);
     }
     if (idDocument) {
       updateFields.idDocument = idDocument;
@@ -124,13 +174,15 @@ export const updateProfile = async (req, res) => {
       updateFields.idSelfie = idSelfie;
       updateFields.verificationStatus = 'pending';
     }
+    
     const updatedUser = await User.findByIdAndUpdate(
       req.user.userId,
       updateFields,
       { new: true }
     ).select('-passwordHash');
+    
     res.status(200).json({
-      message: "Profile updated and KYC submitted.",
+      message: "Profile updated successfully!",
       user: updatedUser,
     });
   } catch (err) {

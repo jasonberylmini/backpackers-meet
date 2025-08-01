@@ -31,7 +31,7 @@ const PersonalChat = ({ otherUserId, otherUserName, currentUser }) => {
       setMessages((prev) => [...prev, data]);
       // Show toast for new messages
       if (data.sender.id !== currentUser.userId) {
-        toast(`${data.sender.name}: ${data.text}`, {
+        toast(`${data.sender.username || data.sender.name || 'Unknown'}: ${data.text}`, {
           duration: 3000,
           position: 'top-right',
         });

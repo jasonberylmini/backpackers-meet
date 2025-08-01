@@ -41,6 +41,10 @@ export default function Register() {
         <p className="signup-desc">Join RideTribe to connect with travelers around the world</p>
         <form onSubmit={handleSubmit} className="signup-form">
           <div className="signup-field">
+            <label>Name</label>
+            <input type="text" name="name" value={form.name} onChange={handleChange} required />
+          </div>
+          <div className="signup-field">
             <label>Email</label>
             <input type="email" name="email" value={form.email} onChange={handleChange} required />
           </div>

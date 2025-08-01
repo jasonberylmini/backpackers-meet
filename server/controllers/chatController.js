@@ -351,6 +351,47 @@ export const markMessagesAsRead = async (req, res) => {
   }
 };
 
+// Edit a message (only sender can edit)
+export const editMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { text } = req.body;
+    const currentUserId = req.user.userId;
+
+    if (!text || text.trim() === '') {
+      return res.status(400).json({ message: 'Message text cannot be empty.' });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found.' });
+    }
+
+    if (!message.sender.equals(currentUserId)) {
+      return res.status(403).json({ message: 'You can only edit your own messages.' });
+    }
+
+    // Update the message
+    const updatedMessage = await Message.findByIdAndUpdate(
+      messageId,
+      { 
+        text: text.trim(),
+        isEdited: true,
+        editedAt: new Date()
+      },
+      { new: true }
+    ).populate('sender', 'name email profileImage');
+
+    res.status(200).json({
+      message: 'Message edited successfully.',
+      messageData: updatedMessage
+    });
+  } catch (err) {
+    logger.error('Edit Message Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // Delete a message (only sender can delete)
 export const deleteMessage = async (req, res) => {
   try {
@@ -373,6 +414,41 @@ export const deleteMessage = async (req, res) => {
     });
   } catch (err) {
     logger.error('Delete Message Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Delete a chat and all its messages
+export const deleteChat = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const currentUserId = req.user.userId;
+
+    // Find the chat
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({ message: 'Chat not found.' });
+    }
+
+    // Check if user is a participant in the chat
+    const isParticipant = chat.participants.some(participantId => 
+      participantId.toString() === currentUserId
+    );
+    
+    if (!isParticipant) {
+      return res.status(403).json({ message: 'You are not a participant in this chat.' });
+    }
+
+    // Delete all messages in the chat
+    await Message.deleteMany({ chatId });
+
+    // Delete the chat
+    await Chat.findByIdAndDelete(chatId);
+
+    logger.info(`Chat ${chatId} deleted by user ${currentUserId}`);
+    res.status(200).json({ message: 'Chat deleted successfully.' });
+  } catch (err) {
+    logger.error('Delete Chat Error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
