@@ -66,6 +66,13 @@ const expenseSchema = new mongoose.Schema({
     ref: 'User'
   }],
   
+  // Split type (auto or manual)
+  splitType: {
+    type: String,
+    enum: ['auto', 'manual'],
+    default: 'auto'
+  },
+  
   // Individual shares (calculated)
   shares: [{
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

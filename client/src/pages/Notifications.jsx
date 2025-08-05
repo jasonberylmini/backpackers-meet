@@ -181,6 +181,20 @@ export default function Notifications() {
     return notificationDate.toLocaleDateString();
   };
 
+  const getCurrencySymbol = (currency = 'INR') => {
+    const symbols = {
+      USD: '$',
+      EUR: '€',
+      GBP: '£',
+      INR: '₹'
+    };
+    // If it's a custom currency, return the currency code itself
+    if (currency && !symbols[currency]) {
+      return currency;
+    }
+    return symbols[currency] || '₹';
+  };
+
   const handleNotificationClick = (notification) => {
     // Mark as read if unread
     if (!notification.read) {
@@ -350,7 +364,7 @@ export default function Notifications() {
                       )}
                       {notification.data.amount && (
                         <span className="data-item">
-                          💰 ₹{notification.data.amount}
+                          💰 {notification.data.currency ? getCurrencySymbol(notification.data.currency) : '₹'}{notification.data.amount}
                         </span>
                       )}
                     </div>

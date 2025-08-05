@@ -1,0 +1,79 @@
+.currency-breakdown {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.currency-breakdown h4 {
+  margin: 0 0 12px 0;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.breakdown-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.currency-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.currency-amount {
+  font-weight: 600;
+  color: #111827;
+  font-size: 14px;
+}
+
+.usd-equivalent {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.total-usd {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+  color: #059669;
+  font-size: 14px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .currency-breakdown {
+    padding: 12px;
+    margin: 12px 0;
+  }
+  
+  .breakdown-item {
+    padding: 6px 8px;
+  }
+  
+  .currency-amount {
+    font-size: 13px;
+  }
+  
+  .usd-equivalent {
+    font-size: 11px;
+  }
+} 

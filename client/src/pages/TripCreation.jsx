@@ -179,6 +179,20 @@ export default function TripCreation() {
     return tripTypes.find(type => type.value === formData.tripType);
   };
 
+  const getCurrencySymbol = (currency = 'INR') => {
+    const symbols = {
+      USD: '$',
+      EUR: '€',
+      GBP: '£',
+      INR: '₹'
+    };
+    // If it's a custom currency, return the currency code itself
+    if (currency && !symbols[currency]) {
+      return currency;
+    }
+    return symbols[currency] || '₹';
+  };
+
   if (!user) {
     return (
       <div className="trip-creation-container">
@@ -446,7 +460,7 @@ export default function TripCreation() {
                     <div className="summary-item">
                       <span className="label">Budget:</span>
                       <span className="value">
-                        {formData.budget ? `₹${formData.budget}` : 'Not set'}
+                        {formData.budget ? `${getCurrencySymbol()}${formData.budget}` : 'Not set'}
                       </span>
                     </div>
                     <div className="summary-item">

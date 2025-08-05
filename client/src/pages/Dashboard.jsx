@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useSocket } from '../contexts/SocketContext';
+import ExpenseDashboard from '../components/ExpenseDashboard';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -61,6 +62,20 @@ export default function Dashboard() {
     localStorage.removeItem('user');
     navigate('/login');
     toast.success('Logged out successfully');
+  };
+
+  const getCurrencySymbol = (currency = 'INR') => {
+    const symbols = {
+      USD: '$',
+      EUR: '€',
+      GBP: '£',
+      INR: '₹'
+    };
+    // If it's a custom currency, return the currency code itself
+    if (currency && !symbols[currency]) {
+      return currency;
+    }
+    return symbols[currency] || '₹';
   };
 
   if (!user) return null;
@@ -123,7 +138,12 @@ export default function Dashboard() {
           <div className="stat-card stat-card-yellow">
             <div className="stat-icon">💰</div>
             <div>
-              <h3 className="stat-number">₹{stats?.totalExpenses || 0}</h3>
+              <h3 className="stat-number">
+                {stats?.totalExpensesUSD ? 
+                  `${getCurrencySymbol('USD')}${stats.totalExpensesUSD.toFixed(2)} USD` : 
+                  `${getCurrencySymbol()}${stats?.totalExpenses || 0}`
+                }
+              </h3>
               <p className="stat-label">Total Spent</p>
             </div>
           </div>
@@ -146,100 +166,111 @@ export default function Dashboard() {
         </div>
       </section>
 
-
-
-      {/* Recent Trips */}
-      <section className="recent-trips-section">
-        <div className="section-header">
-          <h2 className="section-title">Recent Trips</h2>
-          <button 
-            className="btn btn-secondary"
-            onClick={() => navigate('/trips/browse')}
-          >
-            View All
-          </button>
-        </div>
-        {recentTrips.length > 0 ? (
-          <div className="trips-grid">
-            {recentTrips.slice(0, 3).map(trip => (
-              <div key={trip._id} className="trip-card">
-                <div className="trip-image-container">
-                  <img 
-                    src={trip.image || 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300&h=200&fit=crop'} 
-                    alt={trip.destination}
-                    className="trip-image"
-                  />
-                </div>
-                <div className="trip-content">
-                  <h3 className="trip-title">{trip.destination}</h3>
-                  <p className="trip-date">
-                    {new Date(trip.startDate || trip.date).toLocaleDateString()}
-                  </p>
-                  <p className="trip-members">
-                    {trip.members?.length || 0} members
-                  </p>
-                  <div className="trip-status-container">
-                    <span className={`trip-status trip-status-${trip.status || 'upcoming'}`}>
-                      {trip.status || 'Upcoming'}
-                    </span>
-                  </div>
-                </div>
+      {/* Main Content Grid */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column - Recent Trips */}
+          <div>
+            {/* Recent Trips */}
+            <section className="recent-trips-section">
+              <div className="section-header">
+                <h2 className="section-title">Recent Trips</h2>
+                <button 
+                  className="btn btn-secondary"
+                  onClick={() => navigate('/trips/browse')}
+                >
+                  View All
+                </button>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <div className="empty-icon">🧳</div>
-            <h3 className="empty-title">No trips yet</h3>
-            <p className="empty-description">Start your journey by creating your first trip!</p>
-            <button 
-              className="btn btn-primary"
-              onClick={() => navigate('/trips/create')}
-            >
-              Create Trip
-            </button>
-          </div>
-        )}
-      </section>
+              {recentTrips.length > 0 ? (
+                <div className="trips-grid">
+                  {recentTrips.slice(0, 3).map(trip => (
+                    <div key={trip._id} className="trip-card">
+                      <div className="trip-image-container">
+                        <img 
+                          src={trip.image || 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300&h=200&fit=crop'} 
+                          alt={trip.destination}
+                          className="trip-image"
+                        />
+                      </div>
+                      <div className="trip-content">
+                        <h3 className="trip-title">{trip.destination}</h3>
+                        <p className="trip-date">
+                          {new Date(trip.startDate || trip.date).toLocaleDateString()}
+                        </p>
+                        <p className="trip-members">
+                          {trip.members?.length || 0} members
+                        </p>
+                        <div className="trip-status-container">
+                          <span className={`trip-status trip-status-${trip.status || 'upcoming'}`}>
+                            {trip.status || 'Upcoming'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-icon">🧳</div>
+                  <h3 className="empty-title">No trips yet</h3>
+                  <p className="empty-description">Start your journey by creating your first trip!</p>
+                  <button 
+                    className="btn btn-primary"
+                    onClick={() => navigate('/trips/create')}
+                  >
+                    Create Trip
+                  </button>
+                </div>
+              )}
+            </section>
 
-      {/* Recent Activity */}
-      <section className="recent-activity-section">
-        <div className="section-header">
-          <h2 className="section-title">Recent Activity</h2>
-          <button 
-            className="btn btn-secondary"
-            onClick={() => navigate('/activity')}
-          >
-            View All
-          </button>
-        </div>
-        {recentActivity.length > 0 ? (
-          <div className="activity-card">
-            {recentActivity.slice(0, 5).map((activity, index) => (
-              <div key={index} className="activity-item">
-                <div className="activity-icon">
-                  {activity.type === 'trip' && '🧳'}
-                  {activity.type === 'review' && '⭐'}
-                  {activity.type === 'expense' && '💰'}
-                  {activity.type === 'message' && '💬'}
-                </div>
-                <div className="activity-content">
-                  <p className="activity-description">{activity.description}</p>
-                  <span className="activity-timestamp">
-                    {new Date(activity.timestamp).toLocaleDateString()}
-                  </span>
-                </div>
+            {/* Recent Activity */}
+            <section className="recent-activity-section mt-8">
+              <div className="section-header">
+                <h2 className="section-title">Recent Activity</h2>
+                <button 
+                  className="btn btn-secondary"
+                  onClick={() => navigate('/activity')}
+                >
+                  View All
+                </button>
               </div>
-            ))}
+              {recentActivity.length > 0 ? (
+                <div className="activity-card">
+                  {recentActivity.slice(0, 5).map((activity, index) => (
+                    <div key={index} className="activity-item">
+                      <div className="activity-icon">
+                        {activity.type === 'trip' && '🧳'}
+                        {activity.type === 'review' && '⭐'}
+                        {activity.type === 'expense' && '💰'}
+                        {activity.type === 'message' && '💬'}
+                      </div>
+                      <div className="activity-content">
+                        <p className="activity-description">{activity.description}</p>
+                        <span className="activity-timestamp">
+                          {new Date(activity.timestamp).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-icon">📝</div>
+                  <h3 className="empty-title">No recent activity</h3>
+                  <p className="empty-description">Your activity will appear here as you use the platform</p>
+                </div>
+              )}
+            </section>
           </div>
-        ) : (
-          <div className="empty-state">
-            <div className="empty-icon">📝</div>
-            <h3 className="empty-title">No recent activity</h3>
-            <p className="empty-description">Your activity will appear here as you use the platform</p>
+
+          {/* Right Column - Expense Dashboard */}
+          <div>
+            <ExpenseDashboard currentUser={user} />
           </div>
-        )}
-      </section>
+        </div>
+      </div>
 
       {/* Verification Reminder */}
       {stats?.verificationStatus !== 'verified' && (
