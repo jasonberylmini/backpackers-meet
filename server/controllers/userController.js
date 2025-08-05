@@ -1,4 +1,7 @@
 import User from '../models/User.js';
+import Trip from '../models/Trip.js';
+import Expense from '../models/Expense.js';
+import Review from '../models/Review.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken'; 
 import AdminLog from '../models/AdminLog.js';
@@ -460,6 +463,94 @@ export const getBlockedUsers = async (req, res) => {
   } catch (err) {
     logger.error('Get Blocked Users Error:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Dashboard endpoints
+export const getDashboardStats = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Get user's verification status
+    const user = await User.findById(userId).select('verificationStatus');
+    
+    // Count user's trips
+    const totalTrips = await Trip.countDocuments({
+      $or: [
+        { creator: userId },
+        { members: userId }
+      ]
+    });
+    
+    // Count completed trips (past end date)
+    const completedTrips = await Trip.countDocuments({
+      $or: [
+        { creator: userId },
+        { members: userId }
+      ],
+      endDate: { $lt: new Date() }
+    });
+    
+    // Count upcoming trips (future start date)
+    const upcomingTrips = await Trip.countDocuments({
+      $or: [
+        { creator: userId },
+        { members: userId }
+      ],
+      startDate: { $gt: new Date() }
+    });
+    
+    // Calculate total expenses
+    const expenses = await Expense.find({
+      tripId: {
+        $in: await Trip.find({
+          $or: [
+            { creator: userId },
+            { members: userId }
+          ]
+        }).distinct('_id')
+      }
+    });
+    
+    const totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+    
+    // Count user's reviews
+    const totalReviews = await Review.countDocuments({ author: userId });
+    
+    res.status(200).json({
+      totalTrips,
+      completedTrips,
+      upcomingTrips,
+      totalExpenses,
+      totalReviews,
+      verificationStatus: user.verificationStatus
+    });
+  } catch (error) {
+    logger.error('Dashboard Stats Error:', error);
+    res.status(500).json({ message: 'Failed to fetch dashboard stats' });
+  }
+};
+
+export const getDashboardTrips = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Get user's recent trips
+    const trips = await Trip.find({
+      $or: [
+        { creator: userId },
+        { members: userId }
+      ]
+    })
+    .populate('creator', 'name username profileImage')
+    .populate('members', 'name username profileImage')
+    .sort({ startDate: -1 })
+    .limit(10);
+    
+    res.status(200).json(trips);
+  } catch (error) {
+    logger.error('Dashboard Trips Error:', error);
+    res.status(500).json({ message: 'Failed to fetch dashboard trips' });
   }
 };
 

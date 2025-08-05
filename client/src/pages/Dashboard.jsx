@@ -3,13 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useSocket } from '../contexts/SocketContext';
-import ExpenseDashboard from '../components/ExpenseDashboard';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState(null);
   const [recentTrips, setRecentTrips] = useState([]);
-  const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { isConnected } = useSocket();
@@ -20,40 +18,64 @@ export default function Dashboard() {
     if (!token || !userData) {
       navigate('/login');
     } else {
-      setUser(JSON.parse(userData));
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
       fetchDashboardData();
+      refreshUserData(); // Refresh user data from server
     }
   }, [navigate]);
+
+  const refreshUserData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/users/profile', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const updatedUser = response.data;
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
       
-      const [statsRes, tripsRes, activityRes] = await Promise.all([
+      const [statsRes, tripsRes] = await Promise.all([
         axios.get('/api/users/dashboard/stats', { headers }),
-        axios.get('/api/users/dashboard/trips', { headers }),
-        axios.get('/api/users/dashboard/activity', { headers })
+        axios.get('/api/users/dashboard/trips', { headers })
       ]);
 
       setStats(statsRes.data);
       setRecentTrips(tripsRes.data);
-      setRecentActivity(activityRes.data);
+      
+      // Update user object in localStorage with fresh verification status
+      if (statsRes.data.verificationStatus) {
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const updatedUser = { ...currentUser, verificationStatus: statsRes.data.verificationStatus };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+      }
+      
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
       setLoading(false);
-      // Set default data for demo
+      // Set default data for demo, but use actual user verification status
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
       setStats({
         totalTrips: 0,
         completedTrips: 0,
         upcomingTrips: 0,
         totalExpenses: 0,
         totalReviews: 0,
-        verificationStatus: 'pending'
+        verificationStatus: userData.verificationStatus || 'pending'
       });
       setRecentTrips([]);
-      setRecentActivity([]);
     }
   };
 
@@ -78,6 +100,27 @@ export default function Dashboard() {
     return symbols[currency] || '₹';
   };
 
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300&h=200&fit=crop';
+    
+    // If it's already a full URL, return as is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    
+    // If it's a relative path starting with /uploads, construct the full URL
+    if (imagePath.startsWith('/uploads/')) {
+      return `http://localhost:5000${imagePath}`;
+    }
+    
+    // If it's just a filename, assume it's in uploads
+    if (!imagePath.includes('/')) {
+      return `http://localhost:5000/uploads/${imagePath}`;
+    }
+    
+    return imagePath;
+  };
+
   if (!user) return null;
 
   if (loading) {
@@ -93,6 +136,29 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-container">
+
+      {/* KYC Verification Reminder - Only for unverified users */}
+      {stats?.verificationStatus !== 'verified' && (
+        <section className="verification-section">
+          <div className="verification-card">
+            <div className="verification-content">
+              <div className="verification-icon">
+                📋
+              </div>
+              <div className="verification-text">
+                <h3 className="verification-title">Complete Your Verification</h3>
+                <p className="verification-description">Verify your account to unlock all features and build trust with other travelers.</p>
+                <button 
+                  className="btn btn-success"
+                  onClick={() => navigate('/kyc')}
+                >
+                  Start Verification
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Welcome Section */}
       <section className="dashboard-welcome">
@@ -166,134 +232,69 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Main Content Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Recent Trips */}
-          <div>
-            {/* Recent Trips */}
-            <section className="recent-trips-section">
-              <div className="section-header">
-                <h2 className="section-title">Recent Trips</h2>
-                <button 
-                  className="btn btn-secondary"
-                  onClick={() => navigate('/trips/browse')}
-                >
-                  View All
-                </button>
-              </div>
-              {recentTrips.length > 0 ? (
-                <div className="trips-grid">
-                  {recentTrips.slice(0, 3).map(trip => (
-                    <div key={trip._id} className="trip-card">
-                      <div className="trip-image-container">
-                        <img 
-                          src={trip.image || 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300&h=200&fit=crop'} 
-                          alt={trip.destination}
-                          className="trip-image"
-                        />
-                      </div>
-                      <div className="trip-content">
-                        <h3 className="trip-title">{trip.destination}</h3>
-                        <p className="trip-date">
-                          {new Date(trip.startDate || trip.date).toLocaleDateString()}
-                        </p>
-                        <p className="trip-members">
-                          {trip.members?.length || 0} members
-                        </p>
-                        <div className="trip-status-container">
-                          <span className={`trip-status trip-status-${trip.status || 'upcoming'}`}>
-                            {trip.status || 'Upcoming'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <div className="empty-icon">🧳</div>
-                  <h3 className="empty-title">No trips yet</h3>
-                  <p className="empty-description">Start your journey by creating your first trip!</p>
-                  <button 
-                    className="btn btn-primary"
-                    onClick={() => navigate('/trips/create')}
-                  >
-                    Create Trip
-                  </button>
-                </div>
-              )}
-            </section>
-
-            {/* Recent Activity */}
-            <section className="recent-activity-section mt-8">
-              <div className="section-header">
-                <h2 className="section-title">Recent Activity</h2>
-                <button 
-                  className="btn btn-secondary"
-                  onClick={() => navigate('/activity')}
-                >
-                  View All
-                </button>
-              </div>
-              {recentActivity.length > 0 ? (
-                <div className="activity-card">
-                  {recentActivity.slice(0, 5).map((activity, index) => (
-                    <div key={index} className="activity-item">
-                      <div className="activity-icon">
-                        {activity.type === 'trip' && '🧳'}
-                        {activity.type === 'review' && '⭐'}
-                        {activity.type === 'expense' && '💰'}
-                        {activity.type === 'message' && '💬'}
-                      </div>
-                      <div className="activity-content">
-                        <p className="activity-description">{activity.description}</p>
-                        <span className="activity-timestamp">
-                          {new Date(activity.timestamp).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <div className="empty-icon">📝</div>
-                  <h3 className="empty-title">No recent activity</h3>
-                  <p className="empty-description">Your activity will appear here as you use the platform</p>
-                </div>
-              )}
-            </section>
+      {/* Recent Trips Section */}
+      <section className="recent-trips-section">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="section-header">
+            <h2 className="section-title">Recent Trips</h2>
+            <button 
+              className="btn btn-secondary"
+              onClick={() => navigate('/trips/browse')}
+            >
+              View All
+            </button>
           </div>
-
-          {/* Right Column - Expense Dashboard */}
-          <div>
-            <ExpenseDashboard currentUser={user} />
-          </div>
-        </div>
-      </div>
-
-      {/* Verification Reminder */}
-      {stats?.verificationStatus !== 'verified' && (
-        <section className="verification-section">
-          <div className="verification-card">
-            <div className="verification-content">
-              <div className="verification-icon">
-                📋
-              </div>
-              <div className="verification-text">
-                <h3 className="verification-title">Complete Your Verification</h3>
-                <p className="verification-description">Verify your account to unlock all features and build trust with other travelers.</p>
-                <button 
-                  className="btn btn-success"
-                  onClick={() => navigate('/kyc')}
-                >
-                  Start Verification
-                </button>
-              </div>
+          {recentTrips.length > 0 ? (
+                         <div className="trips-grid">
+               {recentTrips.slice(0, 6).map(trip => (
+                 <div 
+                   key={trip._id} 
+                   className="trip-card"
+                   onClick={() => navigate(`/trips/${trip._id}`)}
+                   style={{ cursor: 'pointer' }}
+                 >
+                                     <div className="trip-image-container">
+                     <img 
+                       src={getImageUrl(trip.images?.[0])} 
+                       alt={trip.destination}
+                       className="trip-image"
+                       onError={(e) => {
+                         e.target.src = 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300&h=200&fit=crop';
+                       }}
+                     />
+                   </div>
+                  <div className="trip-content">
+                    <h3 className="trip-title">{trip.destination}</h3>
+                    <p className="trip-date">
+                      {new Date(trip.startDate || trip.date).toLocaleDateString()}
+                    </p>
+                    <p className="trip-members">
+                      {trip.members?.length || 0} members
+                    </p>
+                    <div className="trip-status-container">
+                      <span className={`trip-status trip-status-${trip.status || 'upcoming'}`}>
+                        {trip.status || 'Upcoming'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        </section>
-      )}
+          ) : (
+            <div className="empty-state">
+              <div className="empty-icon">🧳</div>
+              <h3 className="empty-title">No trips yet</h3>
+              <p className="empty-description">Start your journey by creating your first trip!</p>
+              <button 
+                className="btn btn-primary"
+                onClick={() => navigate('/trips/create')}
+              >
+                Create Trip
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 } 

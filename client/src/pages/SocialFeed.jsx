@@ -408,11 +408,11 @@ export default function SocialFeed() {
                                                               {/* Post Header */}
                      <div className="post-header">
                        <div className="post-author">
-                                                   <div 
-                             className="author-avatar clickable"
-                             onClick={() => navigate(`/profile/${post.author._id}`)}
-                             title={`View ${getDisplayName(post.author)}'s profile`}
-                           >
+                         <div 
+                           className="author-avatar clickable"
+                           onClick={() => navigate(`/profile/${post.author._id}`)}
+                           title={`View ${getDisplayName(post.author)}'s profile`}
+                         >
                             {(() => {
                               const profileUrl = getProfileImageUrl(post.author);
                               console.log('Post author profile image URL:', profileUrl, 'Author object:', post.author);

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useSocket } from '../contexts/SocketContext';
+import toast from 'react-hot-toast';
 import './Messages.css';
 
 export default function Messages() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { socket, isConnected, joinRoom, leaveRoom } = useSocket();
+  
   const [activeTab, setActiveTab] = useState('personal');
   const [selectedChat, setSelectedChat] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
@@ -35,6 +39,59 @@ export default function Messages() {
     window.scrollTo(0, 0);
   }, []);
 
+  // Socket event listeners for real-time messaging
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handleNewMessage = (data) => {
+      if (selectedChat && data.roomId === selectedChat._id) {
+        // Convert socket message format to our message format
+        const message = {
+          _id: Date.now().toString(), // Temporary ID
+          text: data.text,
+          sender: {
+            _id: data.sender.id,
+            username: data.sender.name,
+            name: data.sender.name
+          },
+          sentAt: data.timestamp,
+          type: data.type || 'text'
+        };
+        setChatMessages(prev => [...prev, message]);
+      }
+      // Update chat list with new message
+      fetchUserChats();
+    };
+
+    // Note: Server doesn't have socket handlers for message editing/deletion
+    // These are handled via HTTP API calls only
+
+    const handleUserTyping = (data) => {
+      if (selectedChat && data.userId !== (user?.userId || user?._id || user?.id)) {
+        setIsTyping(true);
+        setTimeout(() => setIsTyping(false), 3000);
+      }
+    };
+
+    socket.on('receiveMessage', handleNewMessage);
+    socket.on('userTyping', handleUserTyping);
+
+    return () => {
+      socket.off('receiveMessage', handleNewMessage);
+      socket.off('userTyping', handleUserTyping);
+    };
+  }, [socket, isConnected, selectedChat, user]);
+
+  // Join/leave chat room when selected chat changes
+  useEffect(() => {
+    if (selectedChat && socket && isConnected) {
+      joinRoom(selectedChat._id);
+      return () => {
+        leaveRoom(selectedChat._id);
+      };
+    }
+  }, [selectedChat, socket, isConnected, joinRoom, leaveRoom]);
+
   // Fetch user's chats
   const fetchUserChats = async () => {
     try {
@@ -54,9 +111,13 @@ export default function Messages() {
         
         setPersonalChats(personal);
         setGroupChats(group);
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to fetch chats');
       }
     } catch (error) {
       console.error('Error fetching chats:', error);
+      toast.error('Failed to fetch chats');
     } finally {
       setLoading(false);
     }
@@ -76,9 +137,13 @@ export default function Messages() {
       if (response.ok) {
         const data = await response.json();
         return data.chat;
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to get trip chat');
       }
     } catch (error) {
       console.error('Error getting trip chat:', error);
+      toast.error('Failed to get trip chat');
     }
     return null;
   };
@@ -97,11 +162,32 @@ export default function Messages() {
       if (response.ok) {
         const data = await response.json();
         return data.messages;
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to fetch messages');
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
+      toast.error('Failed to fetch messages');
     }
     return [];
+  };
+
+  // Mark message as read
+  const markMessageAsRead = async (messageId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`http://localhost:5000/api/chat/${selectedChat._id}/messages/read`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ messageIds: [messageId] })
+      });
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
   };
 
   // Send message
@@ -122,10 +208,22 @@ export default function Messages() {
         const data = await response.json();
         // Add the new message to the chat
         setChatMessages(prev => [...prev, data.messageData]);
+        // Send via socket for real-time updates
+        if (socket && isConnected) {
+          socket.emit('sendMessage', {
+            roomId: chatId,
+            text: text,
+            type: 'text'
+          });
+        }
         return data.messageData;
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to send message');
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      toast.error('Failed to send message');
     } finally {
       setSendingMessage(false);
     }
@@ -135,7 +233,6 @@ export default function Messages() {
   // Edit message
   const editMessage = async (messageId, newText) => {
     try {
-      console.log('Editing message:', messageId, 'with text:', newText);
       const token = localStorage.getItem('token');
       const response = await fetch(`http://localhost:5000/api/chat/messages/${messageId}`, {
         method: 'PATCH',
@@ -145,25 +242,27 @@ export default function Messages() {
         },
         body: JSON.stringify({ text: newText })
       });
-
-      console.log('Edit response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Edit response data:', data);
         // Update the message in the chat
         setChatMessages(prev => prev.map(msg => 
           msg._id === messageId ? { ...msg, text: newText, isEdited: true } : msg
         ));
         setEditingMessage(null);
         setEditText('');
+        
+        // Note: Socket events for message editing not implemented on server
+        
+        toast.success('Message edited successfully');
         return data.message;
       } else {
-        const errorData = await response.text();
-        console.error('Edit failed:', response.status, errorData);
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to edit message');
       }
     } catch (error) {
       console.error('Error editing message:', error);
+      toast.error('Failed to edit message');
     }
     return null;
   };
@@ -171,7 +270,6 @@ export default function Messages() {
   // Delete message
   const deleteMessage = async (messageId) => {
     try {
-      console.log('Deleting message:', messageId);
       const token = localStorage.getItem('token');
       const response = await fetch(`http://localhost:5000/api/chat/messages/${messageId}`, {
         method: 'DELETE',
@@ -180,21 +278,23 @@ export default function Messages() {
           'Content-Type': 'application/json'
         }
       });
-
-      console.log('Delete response status:', response.status);
       
       if (response.ok) {
-        console.log('Message deleted successfully');
         // Remove the message from the chat
         setChatMessages(prev => prev.filter(msg => msg._id !== messageId));
         setShowMessageOptions(null);
+        
+        // Note: Socket events for message deletion not implemented on server
+        
+        toast.success('Message deleted successfully');
         return true;
       } else {
-        const errorData = await response.text();
-        console.error('Delete failed:', response.status, errorData);
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to delete message');
       }
     } catch (error) {
       console.error('Error deleting message:', error);
+      toast.error('Failed to delete message');
     }
     return false;
   };
@@ -338,7 +438,25 @@ export default function Messages() {
 
     const message = await sendMessage(selectedChat._id, newMessage);
     if (message) {
-    setNewMessage('');
+      setNewMessage('');
+      // Stop typing indicator
+      if (socket && isConnected && selectedChat) {
+        socket.emit('typing', { roomId: selectedChat._id, isTyping: false });
+      }
+    }
+  };
+
+  // Handle typing indicator
+  const handleInputChange = (e) => {
+    setNewMessage(e.target.value);
+    
+    // Start/stop typing indicator
+    if (socket && isConnected && selectedChat) {
+      if (e.target.value.trim()) {
+        socket.emit('typing', { roomId: selectedChat._id, isTyping: true });
+      } else {
+        socket.emit('typing', { roomId: selectedChat._id, isTyping: false });
+      }
     }
   };
 
@@ -352,16 +470,10 @@ export default function Messages() {
 
   // Navigate to user profile
   const handleProfileClick = (userId) => {
-    console.log('Profile click - User ID:', userId);
-    console.log('Current user data:', user);
-    console.log('Current user ID:', user?.id);
-    console.log('Navigating to profile:', `/profile/${userId}`);
-    
-    // Ensure we're navigating to the correct user's profile
     if (userId) {
       navigate(`/profile/${userId}`);
     } else {
-      console.error('No user ID provided for profile navigation');
+      toast.error('Unable to navigate to profile');
     }
   };
 
@@ -497,19 +609,10 @@ export default function Messages() {
       const timeDiff = currentGroup ? new Date(message.sentAt) - new Date(currentGroup.messages[currentGroup.messages.length - 1].sentAt) : 0;
       const shouldGroup = isSameSender && timeDiff < 300000; // 5 minutes
 
-      // Debug sender ID comparison
+      // Compare sender ID with current user ID
       const senderId = message.sender._id;
-      const currentUserId = user?.id; // Use 'id' field from user object
+      const currentUserId = user?.userId || user?._id || user?.id; // Handle all possible user ID fields
       const isOwn = senderId === currentUserId;
-      
-      console.log(`Message ${index}:`, {
-        senderName: message.sender.username || message.sender.name || 'Unknown',
-        senderId: senderId,
-        currentUserId: currentUserId,
-        isOwn: isOwn,
-        senderIdType: typeof senderId,
-        currentUserIdType: typeof currentUserId
-      });
 
       if (shouldGroup) {
         currentGroup.messages.push(message);
@@ -599,30 +702,14 @@ export default function Messages() {
                          <div className="message-sender-info">
                            <div 
                              className="sender-avatar clickable"
-                             onClick={() => {
-                               console.log('Avatar clicked for sender:', message.sender);
-                               console.log('Current user:', user);
-                               console.log('Sender ID:', message.sender._id);
-                               console.log('Current user ID:', user?.id);
-                               console.log('Are they the same?', message.sender._id === user?.id);
-                               handleProfileClick(message.sender._id);
-                             }}
+                             onClick={() => handleProfileClick(message.sender._id)}
                              title={`View ${message.sender.username}'s profile`}
                            >
                              {(() => {
-                               console.log('Profile image debug for', message.sender.username, ':', {
-                                 profileImage: message.sender.profileImage,
-                                 hasProfileImage: !!message.sender.profileImage,
-                                 profileImageType: typeof message.sender.profileImage,
-                                 profileImageLength: message.sender.profileImage ? message.sender.profileImage.length : 0
-                               });
-                               
                                // Show profile image if it exists and is not empty
                                const shouldShowImage = message.sender.profileImage && 
                                                       message.sender.profileImage.trim() !== '' && 
                                                       message.sender.profileImage !== 'default-avatar.png';
-                               
-                               console.log('Should show image for', message.sender.username, ':', shouldShowImage);
                                
                                return shouldShowImage ? (
                                  <img 
@@ -630,12 +717,8 @@ export default function Messages() {
                                    alt={message.sender.username || message.sender.name || 'Unknown'}
                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                    onError={(e) => {
-                                     console.log('Image failed to load:', message.sender.profileImage);
                                      e.target.style.display = 'none';
                                      e.target.nextSibling.style.display = 'flex';
-                                   }}
-                                   onLoad={() => {
-                                     console.log('Image loaded successfully:', message.sender.profileImage);
                                    }}
                                  />
                                ) : null;
@@ -651,14 +734,7 @@ export default function Messages() {
                            <div className="sender-details">
                              <div 
                                className="sender-name clickable"
-                               onClick={() => {
-                                 console.log('Name clicked for sender:', message.sender);
-                                 console.log('Current user:', user);
-                                 console.log('Sender ID:', message.sender._id);
-                                 console.log('Current user ID:', user?.id);
-                                 console.log('Are they the same?', message.sender._id === user?.id);
-                                 handleProfileClick(message.sender._id);
-                               }}
+                               onClick={() => handleProfileClick(message.sender._id)}
                                title={`View ${message.sender.username}'s profile`}
                              >
                                {message.sender.username || message.sender.name || 'Unknown'}
@@ -691,11 +767,7 @@ export default function Messages() {
                               />
                               <div className="edit-actions">
                                 <button 
-                                  onClick={() => {
-                                    console.log('Save button clicked for message:', message._id);
-                                    console.log('Edit text:', editText);
-                                    editMessage(message._id, editText);
-                                  }}
+                                  onClick={() => editMessage(message._id, editText)}
                                   className="edit-save-btn"
                                 >
                                   Save
@@ -786,7 +858,7 @@ export default function Messages() {
                 <input
                   type="text"
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                  onChange={handleInputChange}
                   placeholder="Type your message..."
                   className="chat-input"
                   disabled={sendingMessage}
@@ -920,14 +992,14 @@ export default function Messages() {
               >
                 <div className="message-avatar">
                       {activeTab === 'personal' 
-                        ? (chat.participants?.find(p => p._id !== user?.id)?.profileImage || '👤')
+                        ? (chat.participants?.find(p => p._id !== (user?.userId || user?._id || user?.id))?.profileImage || '👤')
                         : '🧳'
                       }
                 </div>
                 <div className="chat-list-content">
                   <div className="chat-title">
                         {activeTab === 'personal' 
-                          ? chat.name || `Chat with ${chat.participants?.find(p => p._id !== user?.id)?.name || 'User'}`
+                          ? chat.name || `Chat with ${chat.participants?.find(p => p._id !== (user?.userId || user?._id || user?.id))?.name || 'User'}`
                           : chat.name || 'Trip Chat'
                         }
                   </div>

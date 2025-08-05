@@ -9,19 +9,18 @@ export default function UserNavigation() {
   const { isConnected } = useSocket();
 
   const navigationItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '🏠' },
+    { path: '/social', label: 'Social Feed', icon: '🏠' },
     { path: '/trips/browse', label: 'Discover Trips', icon: '🧳' },
     { path: '/trips/create', label: 'Create Trip', icon: '➕' },
     { path: '/expenses', label: 'Expenses', icon: '💰' },
-    { path: '/social', label: 'Social Feed', icon: '💬' },
     { path: '/notifications', label: 'Notifications', icon: '🔔' },
     { path: '/profile', label: 'Profile', icon: '👤' },
     { path: '/kyc', label: 'KYC Verification', icon: '📋' }
   ];
 
   const isActive = (path) => {
-    if (path === '/dashboard') {
-      return location.pathname === '/dashboard';
+    if (path === '/social') {
+      return location.pathname === '/social';
     }
     if (path === '/trips/browse') {
       return location.pathname === '/trips/browse';

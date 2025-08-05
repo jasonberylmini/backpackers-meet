@@ -344,9 +344,9 @@ export default function KYCVerification() {
             </div>
             <button 
               className="primary-btn"
-              onClick={() => navigate('/dashboard')}
+                              onClick={() => navigate('/social')}
             >
-              Go to Dashboard
+                              Go to Social Feed
             </button>
           </div>
         </section>

@@ -4,7 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import Home from './pages/Home';
 import Register from './pages/Register';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
+
 import TripDiscovery from './pages/TripDiscovery';
 import TripCreation from './pages/TripCreation';
 import TripDetails from './pages/TripDetails';
@@ -36,7 +36,7 @@ function AppRoutes() {
   // Hide header on admin pages
   const isAdminRoute = location.pathname.startsWith('/admin');
   const isResetPasswordRoute = location.pathname.startsWith('/reset-password');
-  const isUserRoute = location.pathname.startsWith('/dashboard') || 
+          const isUserRoute = location.pathname.startsWith('/social') || 
                      location.pathname.startsWith('/trips') || 
                      location.pathname.startsWith('/profile') || 
                      location.pathname.startsWith('/expenses') || 
@@ -70,13 +70,6 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword />} />
         
         {/* User Routes */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <UserLayout>
-              <Dashboard />
-            </UserLayout>
-          </ProtectedRoute>
-        } />
         <Route path="/trips/browse" element={
           <ProtectedRoute>
             <UserLayout>

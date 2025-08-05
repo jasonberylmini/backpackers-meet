@@ -18,12 +18,12 @@ export const createPost = async (req, res) => {
       return res.status(400).json({ message: 'Audience must be either "worldwide" or "nearby".' });
     }
     let country = '';
-    if (audience === 'nearby') {
-      if (!user.country) {
-        return res.status(400).json({ message: 'User country required for nearby posts.' });
-      }
-      country = user.country;
+    // Always store the user's country for both nearby and worldwide posts
+    // This allows worldwide posts to also appear in nearby feed for users from the same country
+    if (!user.country) {
+      return res.status(400).json({ message: 'User country required to create posts.' });
     }
+    country = user.country;
     const post = new Post({
       author: req.user.userId,
       content,
@@ -83,15 +83,34 @@ export const deletePost = async (req, res) => {
 export const getAllPosts = async (req, res) => {
   try {
     const { audience } = req.query;
+    const user = await User.findById(req.user.userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+    
     let filter = {};
     
     if (audience === 'nearby') {
-      const user = await User.findById(req.user.userId);
-      if (!user || !user.country) {
+      // For nearby feed: show nearby posts from same country + worldwide posts from same country
+      if (!user.country) {
         return res.status(400).json({ message: 'User country required for nearby feed.' });
       }
-      filter = { audience: 'nearby', country: user.country };
+      
+      // Get posts that are either:
+      // 1. Nearby posts from the same country
+      // 2. Worldwide posts from the same country
+      filter = {
+        $or: [
+          { audience: 'nearby', country: user.country },
+          { audience: 'worldwide', country: user.country }
+        ]
+      };
     } else if (audience === 'worldwide') {
+      // For worldwide feed: show only worldwide posts (regardless of country)
+      filter = { audience: 'worldwide' };
+    } else {
+      // Default to worldwide if no audience specified
       filter = { audience: 'worldwide' };
     }
     
@@ -108,6 +127,7 @@ export const getAllPosts = async (req, res) => {
       
     res.status(200).json(posts);
   } catch (err) {
+    console.error('Error fetching posts:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };

@@ -152,17 +152,29 @@ export default function ProfileView() {
 
   // Remove the old getInitials function as we're using the utility now
 
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
   const getImageUrl = (imagePath) => {
     if (!imagePath) return null;
     
-    // If it's already a full URL or blob URL, return as is
-    if (imagePath.startsWith('http') || imagePath.startsWith('blob:')) {
+    // If it's already a full URL, return as is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
       return imagePath;
     }
     
-    // Handle both old format (with uploads\) and new format (just filename)
-    const filename = imagePath.includes('uploads') ? imagePath.split(/[/\\]/).pop() : imagePath;
-    return `/uploads/${filename}`;
+    // If it's a relative path starting with /uploads, construct the full URL
+    if (imagePath.startsWith('/uploads/')) {
+      return `http://localhost:5000${imagePath}`;
+    }
+    
+    // If it's just a filename, assume it's in uploads
+    if (!imagePath.includes('/')) {
+      return `http://localhost:5000/uploads/${imagePath}`;
+    }
+    
+    return imagePath;
   };
 
   const formatJoinDate = (dateString) => {
@@ -461,8 +473,8 @@ export default function ProfileView() {
                 {trips.map(trip => (
                   <div key={trip._id} className="trip-card" onClick={() => navigate(`/trips/${trip._id}`)}>
                     <div className="trip-image">
-                      {trip.image ? (
-                        <img src={trip.image} alt={trip.destination} />
+                                      {trip.images && trip.images.length > 0 ? (
+                  <img src={getImageUrl(trip.images[0])} alt={trip.destination} />
                       ) : (
                         <div className="trip-image-placeholder">
                           🗺️
