@@ -992,7 +992,14 @@ export default function Messages() {
               >
                 <div className="message-avatar">
                       {activeTab === 'personal' 
-                        ? (chat.participants?.find(p => p._id !== (user?.userId || user?._id || user?.id))?.profileImage || '👤')
+                        ? (() => {
+                            const participant = chat.participants?.find(p => p._id !== (user?.userId || user?._id || user?.id));
+                            if (participant?.profileImage && participant.profileImage.trim() !== '' && participant.profileImage !== 'default-avatar.png') {
+                              return <img src={participant.profileImage} alt={participant.username || participant.name || 'User'} />;
+                            } else {
+                              return <span>{(participant?.username || participant?.name || 'U').charAt(0).toUpperCase()}</span>;
+                            }
+                          })()
                         : '🧳'
                       }
                 </div>

@@ -10,7 +10,6 @@ import TripCreation from './pages/TripCreation';
 import TripDetails from './pages/TripDetails';
 import UserProfile from './pages/UserProfile';
 import ProfileView from './pages/ProfileView';
-import FriendProfile from './pages/FriendProfile';
 import Expenses from './pages/Expenses';
 import SocialFeed from './pages/SocialFeed';
 import Messages from './pages/Messages';
@@ -105,10 +104,10 @@ function AppRoutes() {
             </UserLayout>
           </ProtectedRoute>
         } />
-        <Route path="/profile/:friendId" element={
+        <Route path="/profile/:userId" element={
           <ProtectedRoute>
             <UserLayout>
-              <FriendProfile />
+              <ProfileView />
             </UserLayout>
           </ProtectedRoute>
         } />

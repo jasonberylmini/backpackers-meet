@@ -7,6 +7,7 @@ import { getDisplayName, getDisplayInitials } from '../utils/userDisplay';
 
 export default function ProfileView() {
   const [user, setUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('posts');
   const [posts, setPosts] = useState([]);
@@ -16,21 +17,27 @@ export default function ProfileView() {
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
-  const { userId } = useParams(); // Get the user ID from URL parameters
+  const { userId } = useParams();
+
+  const isOwnProfile = !userId;
 
   useEffect(() => {
+    const currentUserData = JSON.parse(localStorage.getItem('user') || '{}');
+    setCurrentUser(currentUserData);
+    
     fetchUserProfile();
-    // Scroll to top when component mounts
     window.scrollTo(0, 0);
-  }, [userId]); // Re-fetch when userId changes
+  }, [userId]);
 
   useEffect(() => {
     if (user) {
       fetchUserPosts();
       fetchUserTrips();
-      fetchUserFriends();
+      if (isOwnProfile) {
+        fetchUserFriends();
+      }
     }
-  }, [user]);
+  }, [user, isOwnProfile]);
 
   const fetchUserProfile = async () => {
     try {
@@ -42,33 +49,16 @@ export default function ProfileView() {
       }
       
       const headers = { Authorization: `Bearer ${token}` };
-      
-      // Use the userId from URL parameters if available, otherwise fetch current user's profile
       const endpoint = userId ? `/api/users/${userId}` : '/api/users/profile';
-      console.log('=== PROFILE DEBUG ===');
-      console.log('URL userId parameter:', userId);
-      console.log('Current user from localStorage:', JSON.parse(localStorage.getItem('user')));
-      console.log('Using endpoint:', endpoint);
-      console.log('====================');
       
       const response = await axios.get(endpoint, { headers });
-      console.log('User profile data:', response.data);
-      
-      // Handle different response formats
       const userData = response.data.user || response.data;
-      console.log('Processed user data:', userData);
-      console.log('Profile image path:', userData.profileImage);
-      console.log('Cover image path:', userData.coverImage);
-      console.log('Profile image type:', typeof userData.profileImage);
-      console.log('Cover image type:', typeof userData.coverImage);
-      console.log('Profile image truthy check:', !!userData.profileImage);
-      console.log('Cover image truthy check:', !!userData.coverImage);
+      
       setUser(userData);
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch profile:', error);
       setLoading(false);
-      // Don't show error toast, just set user to null
       setUser(null);
     }
   };
@@ -78,13 +68,11 @@ export default function ProfileView() {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
       
-      // Get posts for the specific user (either from URL or current user)
       const targetUserId = userId || user?._id;
       const response = await axios.get('/api/posts/user/' + targetUserId, { headers });
       setPosts(response.data);
     } catch (error) {
       console.error('Failed to fetch posts:', error);
-      // Set empty array as fallback
       setPosts([]);
     }
   };
@@ -94,18 +82,14 @@ export default function ProfileView() {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
       
-      // For now, only show trips for the current user since there's no endpoint for other users' trips
-      // TODO: Add an endpoint to get trips for a specific user
-      if (!userId) {
+      if (isOwnProfile) {
         const response = await axios.get('/api/trips/mine', { headers });
         setTrips(response.data);
       } else {
-        // If viewing another user's profile, show empty trips for now
         setTrips([]);
       }
     } catch (error) {
       console.error('Failed to fetch trips:', error);
-      // Set empty array as fallback
       setTrips([]);
     }
   };
@@ -115,61 +99,29 @@ export default function ProfileView() {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
       
-      // For now, we'll use a mock friends list since the friends system isn't fully implemented
-      // In a real implementation, this would be: const response = await axios.get('/api/users/friends', { headers });
-             const mockFriends = [
-         {
-           _id: '68866fa9648e12363ee84543', // Real user ID from database
-           name: 'Sarah Manager',
-           username: 'sarah.manager',
-           profileImage: null,
-           country: 'Canada',
-           bio: 'Photographer and backpacker'
-         },
-         {
-           _id: '68866fa9648e12363ee84541', // Real user ID from database
-           name: 'Jason Admin',
-           username: 'jason.admin',
-           profileImage: null,
-           country: 'USA',
-           bio: 'Adventure seeker and travel enthusiast'
-         },
-         {
-           _id: '68774d3089f19e43627b356b', // Real user ID from database
-           name: 'joel',
-           username: 'joel',
-           profileImage: null,
-           country: 'UK',
-           bio: 'Backpacking through Europe'
-         }
-       ];
-      setFriends(mockFriends);
+      if (isOwnProfile) {
+        const response = await axios.get('/api/users/friends', { headers });
+        setFriends(response.data);
+      } else {
+        setFriends([]);
+      }
     } catch (error) {
       console.error('Failed to fetch friends:', error);
       setFriends([]);
     }
   };
 
-  // Remove the old getInitials function as we're using the utility now
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString();
-  };
-
   const getImageUrl = (imagePath) => {
     if (!imagePath) return null;
     
-    // If it's already a full URL, return as is
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
       return imagePath;
     }
     
-    // If it's a relative path starting with /uploads, construct the full URL
     if (imagePath.startsWith('/uploads/')) {
       return `http://localhost:5000${imagePath}`;
     }
     
-    // If it's just a filename, assume it's in uploads
     if (!imagePath.includes('/')) {
       return `http://localhost:5000/uploads/${imagePath}`;
     }
@@ -196,7 +148,6 @@ export default function ProfileView() {
       
       await axios.put(`/api/posts/${postId}`, { content: editContent }, { headers });
       
-      // Update the post in the local state
       setPosts(posts.map(post => 
         post._id === postId 
           ? { ...post, content: editContent }
@@ -208,7 +159,7 @@ export default function ProfileView() {
       toast.success('Post updated successfully!');
     } catch (error) {
       console.error('Failed to update post:', error);
-      toast.error(error.response?.data?.message || 'Failed to update post');
+      toast.error('Failed to update post');
     } finally {
       setSaving(false);
     }
@@ -223,27 +174,34 @@ export default function ProfileView() {
     if (!window.confirm('Are you sure you want to delete this post?')) {
       return;
     }
-
+    
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
       
       await axios.delete(`/api/posts/${postId}`, { headers });
-      
-      // Remove the post from local state
       setPosts(posts.filter(post => post._id !== postId));
-      
       toast.success('Post deleted successfully!');
     } catch (error) {
       console.error('Failed to delete post:', error);
-      toast.error(error.response?.data?.message || 'Failed to delete post');
+      toast.error('Failed to delete post');
     }
+  };
+
+  const handleSendMessage = () => {
+    if (!isOwnProfile && user) {
+      navigate(`/messages?user=${user._id}`);
+    }
+  };
+
+  const handleViewFriendProfile = (friendId) => {
+    navigate(`/profile/${friendId}`);
   };
 
   if (loading) {
     return (
-      <div className="profile-view-container">
-        <div className="loading-state">
+      <div className="modern-profile-container">
+        <div className="loading-container">
           <div className="loading-spinner"></div>
           <p>Loading profile...</p>
         </div>
@@ -253,19 +211,16 @@ export default function ProfileView() {
 
   if (!user) {
     return (
-      <div className="profile-view-container">
-        <div className="error-state">
+      <div className="modern-profile-container">
+        <div className="error-container">
           <div className="error-icon">⚠️</div>
-          <h3>Failed to load profile</h3>
-          <p>Please try refreshing the page or check your connection.</p>
+          <h3>Profile not found</h3>
+          <p>The user profile you're looking for doesn't exist or may have been removed.</p>
           <button 
-            className="retry-btn"
-            onClick={() => {
-              setLoading(true);
-              fetchUserProfile();
-            }}
+            className="btn-primary"
+            onClick={() => navigate('/profile')}
           >
-            Try Again
+            Back to My Profile
           </button>
         </div>
       </div>
@@ -273,308 +228,394 @@ export default function ProfileView() {
   }
 
   return (
-    <div className="profile-view-container">
-      {/* Profile Header */}
-      <div className="profile-header">
-        <div className="profile-cover">
+    <div className="modern-profile-container">
+      {/* Modern Profile Header */}
+      <div className="profile-hero">
+        <div className="cover-section">
           {user.coverImage ? (
-            <img src={getImageUrl(user.coverImage)} alt="Cover" className="cover-image" onError={(e) => { console.error('Cover image failed to load:', user.coverImage); e.target.style.display = 'none'; }} />
+            <img 
+              src={getImageUrl(user.coverImage)} 
+              alt="Cover" 
+              className="cover-image" 
+              onError={(e) => { e.target.style.display = 'none'; }} 
+            />
           ) : (
-            <div className="cover-placeholder"></div>
+            <div className="cover-placeholder">
+              <div className="cover-gradient"></div>
+            </div>
           )}
-          <div className="profile-avatar">
-            {user.profileImage ? (
-              <img src={getImageUrl(user.profileImage)} alt={getDisplayName(user)} onError={(e) => { console.error('Profile image failed to load:', user.profileImage); e.target.style.display = 'none'; }} />
-            ) : (
-                              <div className="avatar-placeholder">
-                  {getDisplayInitials(user)}
-                </div>
-            )}
-          </div>
         </div>
         
-        <div className="profile-info">
-          <h1 className="profile-name">{getDisplayName(user)}</h1>
-          <p className="profile-location">{user.country || 'Location not set'}</p>
-          <p className="profile-join-date">{formatJoinDate(user.createdAt)}</p>
+        <div className="profile-main">
+          <div className="profile-avatar-section">
+            <div className="avatar-container">
+              {user.profileImage ? (
+                <img 
+                  src={getImageUrl(user.profileImage)} 
+                  alt={getDisplayName(user)} 
+                  className="profile-avatar"
+                  onError={(e) => { e.target.style.display = 'none'; }} 
+                />
+              ) : (
+                <div className="avatar-placeholder">
+                  <span className="avatar-initials">{getDisplayInitials(user)}</span>
+                </div>
+              )}
+            </div>
+          </div>
           
-          {user.instagram ? (
-            <a href={`https://instagram.com/${user.instagram}`} target="_blank" rel="noopener noreferrer" className="social-link">
-              📸 @{user.instagram}
-            </a>
-          ) : (
-            <button className="add-instagram-btn" onClick={() => navigate('/account-settings')}>
-              + Add Instagram
-            </button>
-          )}
-          
-          {user.bio && (
-            <p className="profile-bio">{user.bio}</p>
-          )}
+          <div className="profile-info-section">
+            <div className="profile-header-info">
+              <h1 className="profile-name">{getDisplayName(user)}</h1>
+              <div className="profile-meta">
+                <span className="profile-location">
+                  <i className="icon-location"></i>
+                  {user.country || 'Location not set'}
+                </span>
+                <span className="profile-join-date">
+                  <i className="icon-calendar"></i>
+                  {formatJoinDate(user.createdAt)}
+                </span>
+                {user.instagram && (
+                  <span className="profile-instagram">
+                    <i className="icon-instagram"></i>
+                    <a 
+                      href={`https://instagram.com/${user.instagram}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="instagram-link"
+                    >
+                      @{user.instagram}
+                    </a>
+                  </span>
+                )}
+              </div>
+              {user.bio && (
+                <p className="profile-bio">{user.bio}</p>
+              )}
+            </div>
+            
+            <div className="profile-stats">
+              <div className="stat-card">
+                <span className="stat-number">{trips.length}</span>
+                <span className="stat-label">Trips</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-number">{posts.length}</span>
+                <span className="stat-label">Posts</span>
+              </div>
+              {isOwnProfile && (
+                <div className="stat-card">
+                  <span className="stat-number">{friends.length}</span>
+                  <span className="stat-label">Friends</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="profile-actions">
+              {isOwnProfile ? (
+                <div className="action-buttons">
+                  <button 
+                    className="btn-primary"
+                    onClick={() => navigate('/profile/edit')}
+                  >
+                    <i className="icon-edit"></i>
+                    Edit Profile
+                  </button>
+                  <button 
+                    className="btn-secondary"
+                    onClick={() => navigate('/account-settings')}
+                  >
+                    <i className="icon-settings"></i>
+                    Settings
+                  </button>
+                </div>
+              ) : (
+                <div className="action-buttons">
+                  <button 
+                    className="btn-primary"
+                    onClick={handleSendMessage}
+                  >
+                    <i className="icon-message"></i>
+                    Send Message
+                  </button>
+                  <button 
+                    className="btn-secondary"
+                    onClick={() => navigate('/profile')}
+                  >
+                    <i className="icon-arrow-left"></i>
+                    Back to My Profile
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
+      </div>
 
-        {/* Profile Stats */}
-        <div className="profile-stats">
-          <div className="stat-item">
-            <span className="stat-number">{trips.length}</span>
-            <span className="stat-label">Trips</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">{friends.length}</span>
-            <span className="stat-label">Friends</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">{posts.length}</span>
-            <span className="stat-label">Posts</span>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="profile-actions">
-          {/* Only show edit button if viewing own profile */}
-          {!userId && (
+      {/* Modern Tab Navigation */}
+      <div className="tab-navigation">
+        <div className="tab-container">
+          <button 
+            className={`tab-button ${activeTab === 'posts' ? 'active' : ''}`}
+            onClick={() => setActiveTab('posts')}
+          >
+            <i className="icon-posts"></i>
+            Posts
+            <span className="tab-count">{posts.length}</span>
+          </button>
+          <button 
+            className={`tab-button ${activeTab === 'trips' ? 'active' : ''}`}
+            onClick={() => setActiveTab('trips')}
+          >
+            <i className="icon-trips"></i>
+            Trips
+            <span className="tab-count">{trips.length}</span>
+          </button>
+          {isOwnProfile && (
             <button 
-              className="edit-profile-btn"
-              onClick={() => {
-                navigate('/profile/edit');
-                // Scroll to top when navigating to edit profile
-                window.scrollTo(0, 0);
-              }}
+              className={`tab-button ${activeTab === 'friends' ? 'active' : ''}`}
+              onClick={() => setActiveTab('friends')}
             >
-              ✏️ Edit Profile
+              <i className="icon-friends"></i>
+              Friends
+              <span className="tab-count">{friends.length}</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Content Tabs */}
-      <div className="content-tabs">
-        <button 
-          className={`tab-btn ${activeTab === 'posts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('posts')}
-        >
-          📝 Posts
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'trips' ? 'active' : ''}`}
-          onClick={() => setActiveTab('trips')}
-        >
-          🗓️ Trips
-        </button>
-                 <button 
-           className={`tab-btn ${activeTab === 'friends' ? 'active' : ''}`}
-           onClick={() => setActiveTab('friends')}
-         >
-           👥 Friends
-         </button>
-      </div>
-
-      {/* Tab Content */}
-      <div className="tab-content">
-        {activeTab === 'posts' && (
-          <div className="posts-section">
-            {posts.length > 0 ? (
-              <div className="posts-grid">
-                {posts.map(post => (
-                  <div key={post._id} className="post-card">
-                    <div className="post-header">
-                      <div className="post-author">
-                        <div className="author-avatar">
-                          {getDisplayInitials(user)}
+      {/* Content Area */}
+      <div className="content-area">
+        <div className="content-container">
+          {activeTab === 'posts' && (
+            <div className="posts-content">
+              {posts.length > 0 ? (
+                <div className="posts-grid">
+                  {posts.map(post => (
+                    <div key={post._id} className="post-card-modern">
+                      <div className="post-header-modern">
+                        <div className="post-author-modern">
+                          <div className="author-avatar-modern">
+                            {user.profileImage ? (
+                              <img 
+                                src={getImageUrl(user.profileImage)} 
+                                alt={getDisplayName(user)} 
+                                className="author-image"
+                                onError={(e) => { e.target.style.display = 'none'; }} 
+                              />
+                            ) : (
+                              <div className="author-placeholder">
+                                {getDisplayInitials(user)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="author-info-modern">
+                            <span className="author-name-modern">{getDisplayName(user)}</span>
+                            <span className="post-date-modern">
+                              {new Date(post.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
                         </div>
-                        <div className="author-info">
-                          <span className="author-name">{getDisplayName(user)}</span>
-                          <span className="post-date">
-                            {new Date(post.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="post-actions">
-                        {/* Only show edit/delete buttons for own posts */}
-                        {!userId && (
-                          <>
+                        
+                        {isOwnProfile && (
+                          <div className="post-actions-modern">
                             <button 
-                              className="post-action-btn edit-btn"
+                              className="action-btn edit-btn"
                               onClick={() => handleEditPost(post)}
                               title="Edit post"
                             >
-                              ✏️
+                              <i className="icon-edit-small"></i>
                             </button>
                             <button 
-                              className="post-action-btn delete-btn"
+                              className="action-btn delete-btn"
                               onClick={() => handleDeletePost(post._id)}
                               title="Delete post"
                             >
-                              🗑️
+                              <i className="icon-delete"></i>
                             </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="post-content-modern">
+                        {editingPost === post._id ? (
+                          <div className="edit-form-modern">
+                            <textarea
+                              value={editContent}
+                              onChange={(e) => setEditContent(e.target.value)}
+                              placeholder="Edit your post..."
+                              className="edit-textarea-modern"
+                              rows="3"
+                            />
+                            <div className="edit-actions-modern">
+                              <button 
+                                className="btn-primary btn-small"
+                                onClick={() => handleSaveEdit(post._id)}
+                                disabled={saving}
+                              >
+                                {saving ? 'Saving...' : 'Save'}
+                              </button>
+                              <button 
+                                className="btn-secondary btn-small"
+                                onClick={handleCancelEdit}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="post-text">{post.content}</p>
+                            {post.image && (
+                              <img src={post.image} alt="Post" className="post-image-modern" />
+                            )}
                           </>
                         )}
                       </div>
                     </div>
-                    <div className="post-content">
-                      {editingPost === post._id ? (
-                        <div className="edit-form">
-                          <textarea
-                            value={editContent}
-                            onChange={(e) => setEditContent(e.target.value)}
-                            className="edit-textarea"
-                            placeholder="Edit your post..."
-                            rows="3"
-                          />
-                          <div className="edit-actions">
-                            <button 
-                              className="save-btn"
-                              onClick={() => handleSaveEdit(post._id)}
-                              disabled={saving}
-                            >
-                              {saving ? 'Saving...' : 'Save'}
-                            </button>
-                            <button 
-                              className="cancel-btn"
-                              onClick={handleCancelEdit}
-                              disabled={saving}
-                            >
-                              Cancel
-                            </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state-modern">
+                  <div className="empty-icon-modern">
+                    <i className="icon-posts-large"></i>
+                  </div>
+                  <h3>No posts yet</h3>
+                  <p>{isOwnProfile ? "You haven't shared any posts yet." : `${getDisplayName(user)} hasn't shared any posts yet.`}</p>
+                  {isOwnProfile && (
+                    <button 
+                      className="btn-primary"
+                      onClick={() => navigate('/social')}
+                    >
+                      <i className="icon-plus"></i>
+                      Create Your First Post
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'trips' && (
+            <div className="trips-content">
+              {trips.length > 0 ? (
+                <div className="trips-grid-modern">
+                  {trips.map(trip => (
+                    <div key={trip._id} className="trip-card-modern">
+                      <div className="trip-image-modern">
+                        {trip.images && trip.images.length > 0 ? (
+                          <img src={getImageUrl(trip.images[0])} alt={trip.destination} />
+                        ) : (
+                          <div className="trip-image-placeholder-modern">
+                            <i className="icon-map"></i>
                           </div>
+                        )}
+                        <div className="trip-status-badge">
+                          <span className={`status ${trip.status}`}>
+                            {trip.status}
+                          </span>
                         </div>
-                      ) : (
-                        <>
-                          <p>{post.content}</p>
-                          {post.image && (
-                            <img src={post.image} alt="Post" className="post-image" />
-                          )}
-                        </>
-                      )}
+                      </div>
+                      <div className="trip-info-modern">
+                        <h3 className="trip-destination">{trip.destination}</h3>
+                        <div className="trip-dates-modern">
+                          <i className="icon-calendar-small"></i>
+                          {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+                        </div>
+                      </div>
                     </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state-modern">
+                  <div className="empty-icon-modern">
+                    <i className="icon-trips-large"></i>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <div className="empty-icon">📝</div>
-                <h3>No posts yet</h3>
-                <p>Share your travel experiences with the community</p>
-                <button 
-                  className="create-post-btn"
-                  onClick={() => navigate('/social')}
-                >
-                  Create a Post
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+                  <h3>No trips yet</h3>
+                  <p>{isOwnProfile ? "You haven't created any trips yet." : `${getDisplayName(user)} hasn't created any trips yet.`}</p>
+                  {isOwnProfile && (
+                    <button 
+                      className="btn-primary"
+                      onClick={() => navigate('/trips/create')}
+                    >
+                      <i className="icon-plus"></i>
+                      Create Your First Trip
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
-        {activeTab === 'trips' && (
-          <div className="trips-section">
-            {trips.length > 0 ? (
-              <div className="trips-grid">
-                {trips.map(trip => (
-                  <div key={trip._id} className="trip-card" onClick={() => navigate(`/trips/${trip._id}`)}>
-                    <div className="trip-image">
-                                      {trip.images && trip.images.length > 0 ? (
-                  <img src={getImageUrl(trip.images[0])} alt={trip.destination} />
-                      ) : (
-                        <div className="trip-image-placeholder">
-                          🗺️
-                        </div>
-                      )}
-                    </div>
-                    <div className="trip-info">
-                      <h3>{trip.destination}</h3>
-                      <p className="trip-dates">
-                        {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
-                      </p>
-                      <span className={`trip-status ${trip.status}`}>
-                        {trip.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <div className="empty-icon">🗺️</div>
-                <h3>No trips yet</h3>
-                <p>Start planning your next adventure</p>
-                <button 
-                  className="create-trip-btn"
-                  onClick={() => navigate('/trips/create')}
-                >
-                  Create a Trip
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-                 {/* Friends Tab */}
-         {activeTab === 'friends' && (
-           <div className="friends-section">
-            {friends.length > 0 ? (
-              <div className="friends-grid">
-                {friends.map(friend => (
-                  <div key={friend._id} className="friend-card">
-                    <div className="friend-avatar">
-                      {friend.profileImage ? (
-                        <img src={getImageUrl(friend.profileImage)} alt={getDisplayName(friend)} onError={(e) => { e.target.style.display = 'none'; }} />
-                      ) : (
-                        <div className="friend-avatar-placeholder">
-                          {getDisplayInitials(friend)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="friend-info">
-                      <h3 className="friend-name">{getDisplayName(friend)}</h3>
-                      <p className="friend-username">@{friend.username || friend.name}</p>
-                      <p className="friend-location">{friend.country}</p>
-                      {friend.bio && (
-                        <p className="friend-bio">{friend.bio}</p>
-                      )}
-                    </div>
-                    <div className="friend-actions">
+          {activeTab === 'friends' && isOwnProfile && (
+            <div className="friends-content">
+              {friends.length > 0 ? (
+                <div className="friends-grid-modern">
+                  {friends.map(friend => (
+                    <div key={friend._id} className="friend-card-modern">
+                      <div className="friend-avatar-modern">
+                        {friend.profileImage ? (
+                          <img 
+                            src={getImageUrl(friend.profileImage)} 
+                            alt={getDisplayName(friend)} 
+                            className="friend-image"
+                            onError={(e) => { e.target.style.display = 'none'; }} 
+                          />
+                        ) : (
+                          <div className="friend-placeholder">
+                            {getDisplayInitials(friend)}
+                          </div>
+                        )}
+                      </div>
+                                             <div className="friend-info-modern">
+                         <h3 className="friend-name">{getDisplayName(friend)}</h3>
+                         <p className="friend-location">
+                           <i className="icon-location-small"></i>
+                           {friend.country || 'Location not set'}
+                         </p>
+                         {friend.instagram && (
+                           <p className="friend-instagram">
+                             <i className="icon-instagram"></i>
+                             <a 
+                               href={`https://instagram.com/${friend.instagram}`} 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               className="instagram-link"
+                             >
+                               @{friend.instagram}
+                             </a>
+                           </p>
+                         )}
+                       </div>
                       <button 
-                        className="friend-action-btn view-btn"
-                        onClick={() => {
-                          navigate(`/profile/${friend._id}`);
-                          // Scroll to top when navigating to friend profile
-                          window.scrollTo(0, 0);
-                        }}
-                        title="View Profile"
+                        className="btn-primary btn-small"
+                        onClick={() => handleViewFriendProfile(friend._id)}
                       >
-                        👤 View Profile
-                      </button>
-                      <button 
-                        className="friend-action-btn message-btn"
-                        onClick={() => {
-                          navigate(`/messages?user=${friend._id}`);
-                          // Scroll to top when navigating to messages
-                          window.scrollTo(0, 0);
-                        }}
-                        title="Send Message"
-                      >
-                        💬 Message
+                        View Profile
                       </button>
                     </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state-modern">
+                  <div className="empty-icon-modern">
+                    <i className="icon-friends-large"></i>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <div className="empty-icon">👥</div>
-                <h3>No friends yet</h3>
-                <p>Connect with other travelers to build your network</p>
-                <button 
-                  className="find-friends-btn"
-                  onClick={() => navigate('/social')}
-                >
-                  Find Friends
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+                  <h3>No friends yet</h3>
+                  <p>Connect with other travelers to see them here!</p>
+                  <button 
+                    className="btn-primary"
+                    onClick={() => navigate('/social')}
+                  >
+                    <i className="icon-search"></i>
+                    Browse Users
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

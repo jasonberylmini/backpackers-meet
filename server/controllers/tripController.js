@@ -74,8 +74,8 @@ export const getMyTrips = async (req, res) => {
         { members: req.user.userId }
       ]
     })
-    .populate('creator', 'name email')
-    .populate('members', 'name')
+    .populate('creator', 'name email profileImage username')
+    .populate('members', 'name profileImage username')
     .select('creator destination startDate endDate budget tripType description images members maxMembers createdAt');
 
     res.status(200).json(myTrips);
@@ -90,8 +90,8 @@ export const getTripById = async (req, res) => {
     const { tripId } = req.params;
     
     const trip = await Trip.findById(tripId)
-      .populate('creator', 'name email')
-      .populate('members', 'name email');
+      .populate('creator', 'name email profileImage username')
+      .populate('members', 'name email profileImage username');
     
     if (!trip) {
       return res.status(404).json({ message: 'Trip not found' });
@@ -99,7 +99,7 @@ export const getTripById = async (req, res) => {
     
     res.status(200).json(trip);
   } catch (err) {
-    logger.error("Get trip by ID error:", err);
+    logger.error("Fetch trip error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -155,14 +155,14 @@ export const joinTrip = async (req, res) => {
 export const browseTrips = async (req, res) => {
   try {
     const { destination, tripType } = req.query;
-    const filter = {};
+    const filter = { privacy: 'public' }; // Only show public trips
     if (destination) filter.destination = new RegExp(destination, 'i');
     if (tripType) filter.tripType = tripType;
 
     const trips = await Trip.find(filter)
-      .populate('creator', 'name')
-      .populate('members', 'name')
-      .select('creator destination startDate endDate budget tripType description images members maxMembers createdAt');
+      .populate('creator', 'name profileImage username')
+      .populate('members', 'name profileImage username')
+      .select('creator destination startDate endDate budget tripType description images members maxMembers createdAt privacy');
     
     res.status(200).json(trips);
   } catch (err) {

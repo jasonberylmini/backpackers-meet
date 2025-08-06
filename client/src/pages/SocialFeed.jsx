@@ -20,22 +20,19 @@ export default function SocialFeed() {
   const [editCommentText, setEditCommentText] = useState({});
   const [showPostMenu, setShowPostMenu] = useState({});
   const [showCommentMenu, setShowCommentMenu] = useState({});
-  const [activeTab, setActiveTab] = useState('worldwide'); // 'worldwide' or 'nearby'
+  const [activeTab, setActiveTab] = useState('worldwide');
+  const [modalVisible, setModalVisible] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) {
       const parsedUser = JSON.parse(userData);
-      console.log('User data from localStorage:', parsedUser);
-      console.log('User profileImage field:', parsedUser?.profileImage);
-      console.log('Profile image URL result:', getProfileImageUrl(parsedUser));
       setUser(parsedUser);
     }
     fetchPosts('worldwide');
   }, []);
 
-  // Fetch current user's profile data to get profileImage
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
@@ -45,14 +42,7 @@ export default function SocialFeed() {
         const headers = { Authorization: `Bearer ${token}` };
         const response = await axios.get('/api/users/profile', { headers });
         
-        console.log('Current user profile from API:', response.data);
-        console.log('API profileImage field:', response.data?.profileImage);
-        console.log('API profile image URL result:', getProfileImageUrl(response.data));
-        
-        // Update user state with complete profile data
         setUser(response.data);
-        
-        // Update localStorage with complete profile data
         localStorage.setItem('user', JSON.stringify(response.data));
       } catch (error) {
         console.error('Failed to fetch current user profile:', error);
@@ -62,12 +52,13 @@ export default function SocialFeed() {
     fetchCurrentUser();
   }, []);
 
-  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Close post menus when clicking outside
       if (!event.target.closest('.post-menu')) {
         setShowPostMenu({});
       }
+      // Close comment menus when clicking outside
       if (!event.target.closest('.comment-menu')) {
         setShowCommentMenu({});
       }
@@ -76,6 +67,56 @@ export default function SocialFeed() {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
+  // Handle modal animations
+  useEffect(() => {
+    if (showCreatePost) {
+      setModalVisible(true);
+    } else {
+      const timer = setTimeout(() => setModalVisible(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [showCreatePost]);
+
+  // Close all dropdowns when switching tabs
+  useEffect(() => {
+    setShowPostMenu({});
+    setShowCommentMenu({});
+  }, [activeTab]);
+
+  const handleMenuToggle = (menuType, id) => {
+    if (menuType === 'post') {
+      setShowPostMenu(prev => {
+        const newState = {};
+        // Close all other post menus
+        Object.keys(prev).forEach(key => {
+          if (key !== id) {
+            newState[key] = false;
+          }
+        });
+        // Toggle current menu
+        newState[id] = !prev[id];
+        return newState;
+      });
+      // Close all comment menus when opening a post menu
+      setShowCommentMenu({});
+    } else if (menuType === 'comment') {
+      setShowCommentMenu(prev => {
+        const newState = {};
+        // Close all other comment menus
+        Object.keys(prev).forEach(key => {
+          if (key !== id) {
+            newState[key] = false;
+          }
+        });
+        // Toggle current menu
+        newState[id] = !prev[id];
+        return newState;
+      });
+      // Close all post menus when opening a comment menu
+      setShowPostMenu({});
+    }
+  };
 
   const fetchPosts = async (audience) => {
     try {
@@ -124,18 +165,17 @@ export default function SocialFeed() {
       
       await axios.post(`/api/posts/${postId}/like`, {}, { headers });
       
-      // Update local state
       setPosts(prevPosts => 
         prevPosts.map(post => 
           post._id === postId 
             ? { 
                 ...post, 
-                                 likes: post.likes.includes(user?.userId || user?._id || user?.id) 
-                   ? post.likes.filter(id => id !== (user?.userId || user?._id || user?.id))
-                   : [...post.likes, (user?.userId || user?._id || user?.id)],
-                 likeCount: post.likes.includes(user?.userId || user?._id || user?.id) 
-                   ? (post.likeCount || 0) - 1 
-                   : (post.likeCount || 0) + 1
+                likes: post.likes.includes(user?.userId || user?._id || user?.id) 
+                  ? post.likes.filter(id => id !== (user?.userId || user?._id || user?.id))
+                  : [...post.likes, (user?.userId || user?._id || user?.id)],
+                likeCount: post.likes.includes(user?.userId || user?._id || user?.id) 
+                  ? (post.likeCount || 0) - 1 
+                  : (post.likeCount || 0) + 1
               }
             : post
         )
@@ -156,9 +196,7 @@ export default function SocialFeed() {
       
       const response = await axios.post(`/api/posts/${postId}/comments`, { content: comment }, { headers });
       
-      // Check if response.data exists and has the expected structure
       if (response.data && response.data._id) {
-        // Update local state instead of refetching
         setPosts(prevPosts => 
           prevPosts.map(post => 
             post._id === postId 
@@ -192,7 +230,6 @@ export default function SocialFeed() {
       
       await axios.put(`/api/posts/comments/${commentId}`, { content: comment }, { headers });
       
-      // Update local state instead of refetching
       setPosts(prevPosts => 
         prevPosts.map(post => 
           post._id === postId 
@@ -226,7 +263,6 @@ export default function SocialFeed() {
       
       await axios.delete(`/api/posts/comments/${commentId}`, { headers });
       
-      // Update local state instead of refetching
       setPosts(prevPosts => 
         prevPosts.map(post => 
           post._id === postId 
@@ -274,7 +310,7 @@ export default function SocialFeed() {
       
       toast.success('User blocked successfully!');
       setShowPostMenu(prev => ({ ...prev, [userId]: false }));
-      fetchPosts(activeTab); // Refresh to remove blocked user's posts
+      fetchPosts(activeTab);
     } catch (error) {
       console.error('Failed to block user:', error);
       toast.error('Failed to block user');
@@ -310,7 +346,7 @@ export default function SocialFeed() {
       
       toast.success('User blocked successfully!');
       setShowCommentMenu(prev => ({ ...prev, [userId]: false }));
-      fetchPosts(activeTab); // Refresh to remove blocked user's posts and comments
+      fetchPosts(activeTab);
     } catch (error) {
       console.error('Failed to block user:', error);
       toast.error('Failed to block user');
@@ -336,8 +372,8 @@ export default function SocialFeed() {
 
   if (loading) {
     return (
-      <div className="social-feed-container">
-        <div className="loading-state">
+      <div className="modern-social-container">
+        <div className="loading-container">
           <div className="loading-spinner"></div>
           <p>Loading social feed...</p>
         </div>
@@ -346,407 +382,405 @@ export default function SocialFeed() {
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Welcome Section */}
-      <section className="dashboard-welcome">
-        <div className="welcome-content">
-          <div className="user-welcome">
-            <h1>Social Feed 💬</h1>
-            <p className="user-subtitle">
-              Connect with fellow travelers and share your adventures
-            </p>
+    <div className="modern-social-container">
+      {/* Modern Header */}
+      <div className="social-header">
+        <div className="header-content">
+          <div className="header-info">
+            <h1 className="header-title">Social Feed</h1>
+            <p className="header-subtitle">Connect with fellow travelers and share your adventures</p>
           </div>
-        </div>
-      </section>
-
-      {/* Main Content */}
-      <section className="dashboard-section">
-        <div className="section-header">
-          <h2>Social Feed</h2>
           <button 
-            className="view-all-btn"
+            className="create-post-btn"
             onClick={() => setShowCreatePost(true)}
           >
-            ✏️ Create Post
+            <i className="icon-plus"></i>
+            Create Post
           </button>
         </div>
-        
-        {/* Tab Navigation */}
-        <div className="tab-navigation">
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="tab-navigation">
+        <div className="tab-container">
           <button
-            className={`tab-btn ${activeTab === 'worldwide' ? 'active' : ''}`}
+            className={`tab-button ${activeTab === 'worldwide' ? 'active' : ''}`}
             onClick={() => handleTabChange('worldwide')}
           >
-            🌍 Worldwide
+            <i className="icon-globe"></i>
+            Worldwide
           </button>
           <button
-            className={`tab-btn ${activeTab === 'nearby' ? 'active' : ''}`}
+            className={`tab-button ${activeTab === 'nearby' ? 'active' : ''}`}
             onClick={() => handleTabChange('nearby')}
           >
-            📍 Nearby
+            <i className="icon-location"></i>
+            Nearby
           </button>
         </div>
-        
-        <div className="social-content">
-          <div className="feed-container">
-            {posts.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">📱</div>
-                <h3>No {activeTab} posts yet</h3>
-                <p>Be the first to share your travel experiences!</p>
-                <button 
-                  className="primary-btn"
-                  onClick={() => setShowCreatePost(true)}
-                >
-                  Create First Post
-                </button>
+      </div>
+
+      {/* Feed Content */}
+      <div className="feed-content">
+        <div className="feed-container">
+          {posts.length === 0 ? (
+            <div className="empty-state-modern">
+              <div className="empty-icon-modern">
+                <i className="icon-posts-large"></i>
               </div>
-            ) : (
-              <div className="posts-list">
-                {posts.map(post => (
-                  <div key={post._id} className="post-card">
-                                                              {/* Post Header */}
-                     <div className="post-header">
-                       <div className="post-author">
-                         <div 
-                           className="author-avatar clickable"
-                           onClick={() => navigate(`/profile/${post.author._id}`)}
-                           title={`View ${getDisplayName(post.author)}'s profile`}
-                         >
-                            {(() => {
-                              const profileUrl = getProfileImageUrl(post.author);
-                              console.log('Post author profile image URL:', profileUrl, 'Author object:', post.author);
-                              return profileUrl ? (
-                                <img 
-                                  src={profileUrl} 
-                                  alt={getDisplayName(post.author)}
-                                  onError={(e) => {
-                                    console.log('Post author profile image failed to load:', profileUrl);
-                                    e.target.style.display = 'none';
-                                    e.target.nextSibling.style.display = 'flex';
-                                  }}
-                                  onLoad={() => console.log('Post author profile image loaded successfully:', profileUrl)}
-                                />
-                              ) : null;
-                            })()}
-                            <span style={{ display: getProfileImageUrl(post.author) ? 'none' : 'flex' }}>
-                              {getDisplayFirstChar(post.author)}
-                            </span>
-                          </div>
-                         <div className="author-info">
-                           <h4 
-                             className="clickable"
-                             onClick={() => navigate(`/profile/${post.author._id}`)}
-                             title={`View ${getDisplayName(post.author)}'s profile`}
-                           >
-                             {getDisplayName(post.author)}
-                           </h4>
-                           <span className="post-time">
-                             {formatTimeAgo(post.createdAt)}
-                           </span>
-                         </div>
-                       </div>
-                       <div className="post-menu">
-                         <button 
-                           className="menu-btn"
-                           onClick={() => setShowPostMenu(prev => ({ ...prev, [post._id]: !prev[post._id] }))}
-                         >
-                           ⋮
-                         </button>
-                                                   {showPostMenu[post._id] && (
-                            <div className="menu-dropdown">
-                              {String(post.author._id) === String(user?.userId || user?._id || user?.id) ? (
-                                <>
-                                  <button 
-                                    className="menu-item"
-                                    onClick={() => {
-                                      // TODO: Add edit post functionality
-                                      toast.info('Edit post feature coming soon!');
-                                      setShowPostMenu(prev => ({ ...prev, [post._id]: false }));
-                                    }}
+              <h3>No {activeTab} posts yet</h3>
+              <p>Be the first to share your travel experiences!</p>
+              <button 
+                className="btn-primary"
+                onClick={() => setShowCreatePost(true)}
+              >
+                <i className="icon-plus"></i>
+                Create First Post
+              </button>
+            </div>
+          ) : (
+            <div className="posts-grid">
+              {posts.map(post => (
+                <div key={post._id} className="post-card-modern">
+                  {/* Post Header */}
+                  <div className="post-header-modern">
+                    <div className="post-author-modern">
+                      <div 
+                        className="author-avatar-modern clickable"
+                        onClick={() => navigate(`/profile/${post.author._id}`)}
+                        title={`View ${getDisplayName(post.author)}'s profile`}
+                      >
+                        {(() => {
+                          const profileUrl = getProfileImageUrl(post.author);
+                          return profileUrl ? (
+                            <img 
+                              src={profileUrl} 
+                              alt={getDisplayName(post.author)}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null;
+                        })()}
+                        <span style={{ display: getProfileImageUrl(post.author) ? 'none' : 'flex' }}>
+                          {getDisplayFirstChar(post.author)}
+                        </span>
+                      </div>
+                      <div className="author-info-modern">
+                        <h4 
+                          className="clickable"
+                          onClick={() => navigate(`/profile/${post.author._id}`)}
+                          title={`View ${getDisplayName(post.author)}'s profile`}
+                        >
+                          {getDisplayName(post.author)}
+                        </h4>
+                        <div className="post-meta">
+                          <span className="post-time">
+                            {formatTimeAgo(post.createdAt)}
+                          </span>
+                          <span className="post-audience-badge">
+                            {post.audience === 'nearby' ? '📍' : '🌍'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className={`post-menu ${showPostMenu[post._id] ? 'active' : ''}`}>
+                      <button 
+                        className="menu-btn"
+                        onClick={() => handleMenuToggle('post', post._id)}
+                      >
+                        <i className="icon-more"></i>
+                      </button>
+                      <div className={`menu-dropdown ${showPostMenu[post._id] ? 'show' : ''}`}>
+                        {String(post.author._id) === String(user?.userId || user?._id || user?.id) ? (
+                          <>
+                            <button 
+                              className="menu-item"
+                              onClick={() => {
+                                toast.info('Edit post feature coming soon!');
+                                setShowPostMenu(prev => ({ ...prev, [post._id]: false }));
+                              }}
+                            >
+                              <i className="icon-edit"></i>
+                              Edit Post
+                            </button>
+                            <button 
+                              className="menu-item danger"
+                              onClick={() => {
+                                if (window.confirm('Are you sure you want to delete this post?')) {
+                                  toast.info('Delete post feature coming soon!');
+                                }
+                                setShowPostMenu(prev => ({ ...prev, [post._id]: false }));
+                              }}
+                            >
+                              <i className="icon-delete"></i>
+                              Delete Post
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button 
+                              className="menu-item"
+                              onClick={() => handleReportPost(post._id)}
+                            >
+                              <i className="icon-report"></i>
+                              Report Post
+                            </button>
+                            <button 
+                              className="menu-item danger"
+                              onClick={() => handleBlockUser(post.author._id, getDisplayName(post.author))}
+                            >
+                              <i className="icon-block"></i>
+                              Block User
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Post Content */}
+                  <div className="post-content-modern">
+                    <p className="post-text">{post.content}</p>
+                  </div>
+
+                  {/* Post Actions */}
+                  <div className="post-actions-modern">
+                    <button 
+                      className={`action-btn ${post.likes?.includes(user?.userId || user?._id || user?.id) ? 'liked' : ''}`}
+                      onClick={() => handleLikePost(post._id)}
+                    >
+                      <i className={`icon-heart ${post.likes?.includes(user?.userId || user?._id || user?.id) ? 'filled' : ''}`}></i>
+                      <span>{post.likes?.length || 0}</span>
+                    </button>
+                    <button 
+                      className="action-btn"
+                      onClick={() => setShowComments(prev => ({ ...prev, [post._id]: !prev[post._id] }))}
+                    >
+                      <i className="icon-comment"></i>
+                      <span>{post.comments?.length || 0}</span>
+                    </button>
+                    <button 
+                      className="action-btn"
+                      onClick={() => {
+                        navigator.share ? 
+                          navigator.share({
+                            title: `${getDisplayName(post.author)}'s post`,
+                            text: post.content,
+                            url: window.location.href
+                          }) :
+                          navigator.clipboard.writeText(post.content).then(() => 
+                            toast.success('Post copied to clipboard!')
+                          );
+                      }}
+                    >
+                      <i className="icon-share"></i>
+                      <span>Share</span>
+                    </button>
+                  </div>
+
+                  {/* Comments Section */}
+                  {showComments[post._id] && (
+                    <div className="comments-section-modern">
+                      <div className="comments-header">
+                        <h5>Comments</h5>
+                      </div>
+                      
+                      {/* Add Comment */}
+                      <div className="comment-input-container-modern">
+                        <div className="comment-avatar-modern">
+                          {(() => {
+                            const profileUrl = getProfileImageUrl(user);
+                            return profileUrl ? (
+                              <img 
+                                src={profileUrl} 
+                                alt={getDisplayName(user)}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'flex';
+                                }}
+                              />
+                            ) : null;
+                          })()}
+                          <span style={{ display: getProfileImageUrl(user) ? 'none' : 'flex' }}>
+                            {getDisplayFirstChar(user)}
+                          </span>
+                        </div>
+                        <div className="comment-input-wrapper-modern">
+                          <textarea
+                            placeholder="Write a comment..."
+                            value={commentText[post._id] || ''}
+                            onChange={(e) => setCommentText(prev => ({ ...prev, [post._id]: e.target.value }))}
+                            onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleComment(post._id)}
+                            className="comment-input-modern"
+                            rows="1"
+                          />
+                          <button
+                            onClick={() => handleComment(post._id)}
+                            className="comment-submit-btn-modern"
+                          >
+                            Post
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Comments List */}
+                      {post.comments && post.comments.length > 0 ? (
+                        <div className="comments-list-modern">
+                          {post.comments.map((comment, index) => (
+                            <div key={index} className="comment-item-modern">
+                              <div className="comment-author-modern">
+                                <div 
+                                  className="comment-avatar-modern clickable"
+                                  onClick={() => navigate(`/profile/${comment.author._id}`)}
+                                  title={`View ${getDisplayName(comment.author)}'s profile`}
+                                >
+                                  {(() => {
+                                    const profileUrl = getProfileImageUrl(comment.author);
+                                    return profileUrl ? (
+                                      <img 
+                                        src={profileUrl} 
+                                        alt={getDisplayName(comment.author)}
+                                        onError={(e) => {
+                                          e.target.style.display = 'none';
+                                          e.target.nextSibling.style.display = 'flex';
+                                        }}
+                                      />
+                                    ) : null;
+                                  })()}
+                                  <span style={{ display: getProfileImageUrl(comment.author) ? 'none' : 'flex' }}>
+                                    {getDisplayFirstChar(comment.author)}
+                                  </span>
+                                </div>
+                                <div className="comment-info-modern">
+                                  <span 
+                                    className="comment-name-modern clickable"
+                                    onClick={() => navigate(`/profile/${comment.author._id}`)}
+                                    title={`View ${getDisplayName(comment.author)}'s profile`}
                                   >
-                                    ✏️ Edit Post
-                                  </button>
-                                  <button 
-                                    className="menu-item"
-                                    onClick={() => {
-                                      if (window.confirm('Are you sure you want to delete this post?')) {
-                                        // TODO: Add delete post functionality
-                                        toast.info('Delete post feature coming soon!');
-                                      }
-                                      setShowPostMenu(prev => ({ ...prev, [post._id]: false }));
-                                    }}
-                                  >
-                                    🗑️ Delete Post
-                                  </button>
-                                </>
+                                    {getDisplayName(comment.author)}
+                                  </span>
+                                  <span className="comment-time-modern">
+                                    {formatTimeAgo(comment.createdAt)}
+                                  </span>
+                                </div>
+                                                                 <div className={`comment-menu ${showCommentMenu[comment._id] ? 'active' : ''}`}>
+                                   <button 
+                                     className="menu-btn"
+                                     onClick={() => handleMenuToggle('comment', comment._id)}
+                                   >
+                                     <i className="icon-more"></i>
+                                   </button>
+                                  <div className={`menu-dropdown ${showCommentMenu[comment._id] ? 'show' : ''}`}>
+                                    {String(comment.author._id) === String(user?.userId || user?._id || user?.id) ? (
+                                      <>
+                                        <button 
+                                          className="menu-item"
+                                          onClick={() => {
+                                            setEditingComment(prev => ({ ...prev, [comment._id]: !prev[comment._id] }));
+                                            if (!editingComment[comment._id]) {
+                                              setEditCommentText(prev => ({ ...prev, [comment._id]: comment.content }));
+                                            }
+                                            setShowCommentMenu(prev => ({ ...prev, [comment._id]: false }));
+                                          }}
+                                        >
+                                          <i className="icon-edit"></i>
+                                          Edit Comment
+                                        </button>
+                                        <button 
+                                          className="menu-item danger"
+                                          onClick={() => {
+                                            handleDeleteComment(comment._id, post._id);
+                                            setShowCommentMenu(prev => ({ ...prev, [comment._id]: false }));
+                                          }}
+                                        >
+                                          <i className="icon-delete"></i>
+                                          Delete Comment
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button 
+                                          className="menu-item"
+                                          onClick={() => handleReportComment(comment._id, getDisplayName(comment.author))}
+                                        >
+                                          <i className="icon-report"></i>
+                                          Report Comment
+                                        </button>
+                                        <button 
+                                          className="menu-item danger"
+                                          onClick={() => handleBlockCommentUser(comment.author._id, getDisplayName(comment.author))}
+                                        >
+                                          <i className="icon-block"></i>
+                                          Block User
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              {editingComment[comment._id] ? (
+                                <div className="comment-edit-container-modern">
+                                  <textarea
+                                    value={editCommentText[comment._id] || ''}
+                                    onChange={(e) => setEditCommentText(prev => ({ ...prev, [comment._id]: e.target.value }))}
+                                    className="comment-edit-input-modern"
+                                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleEditComment(comment._id, post._id)}
+                                    rows="2"
+                                  />
+                                  <div className="comment-edit-actions-modern">
+                                    <button 
+                                      className="btn-primary btn-small"
+                                      onClick={() => handleEditComment(comment._id, post._id)}
+                                    >
+                                      Save
+                                    </button>
+                                    <button 
+                                      className="btn-secondary btn-small"
+                                      onClick={() => {
+                                        setEditingComment(prev => ({ ...prev, [comment._id]: false }));
+                                        setEditCommentText(prev => ({ ...prev, [comment._id]: '' }));
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
                               ) : (
-                                <>
-                                  <button 
-                                    className="menu-item"
-                                    onClick={() => handleReportPost(post._id)}
-                                  >
-                                    🚨 Report Post
-                                  </button>
-                                  <button 
-                                    className="menu-item"
-                                    onClick={() => handleBlockUser(post.author._id, getDisplayName(post.author))}
-                                  >
-                                    🚫 Block User
-                                  </button>
-                                </>
+                                <p className="comment-content-modern">{comment.content}</p>
                               )}
                             </div>
-                          )}
-                       </div>
-                     </div>
-
-                     {/* Post Content */}
-                     <div className="post-content">
-                       <p>{post.content}</p>
-                     </div>
-
-                     {/* Post Actions */}
-                     <div className="post-actions">
-                       <button 
-                                                   className={`action-btn ${post.likes?.includes(user?.userId || user?._id || user?.id) ? 'liked' : ''}`}
-                          onClick={() => handleLikePost(post._id)}
-                        >
-                          {post.likes?.includes(user?.userId || user?._id || user?.id) ? '❤️' : '🤍'} {post.likes?.length || 0}
-                       </button>
-                       <button 
-                         className="action-btn"
-                         onClick={() => setShowComments(prev => ({ ...prev, [post._id]: !prev[post._id] }))}
-                       >
-                         💬 {post.comments?.length || 0}
-                       </button>
-                       <button 
-                         className="action-btn"
-                         onClick={() => {
-                           navigator.share ? 
-                             navigator.share({
-                               title: `${getDisplayName(post.author)}'s post`,
-                               text: post.content,
-                               url: window.location.href
-                             }) :
-                             navigator.clipboard.writeText(post.content).then(() => 
-                               toast.success('Post copied to clipboard!')
-                             );
-                         }}
-                       >
-                         📤 Share
-                       </button>
-                     </div>
-
-                    {/* Comments Section */}
-                    {showComments[post._id] && (
-                      <div className="comments-section">
-                        <h5>Comments</h5>
-                        
-                                                 {/* Add Comment */}
-                         <div className="comment-input-container">
-                                                       <div className="comment-avatar">
-                              {(() => {
-                                const profileUrl = getProfileImageUrl(user);
-                                console.log('User profile image URL:', profileUrl, 'User object:', user);
-                                return profileUrl ? (
-                                  <img 
-                                    src={profileUrl} 
-                                    alt={getDisplayName(user)}
-                                    onError={(e) => {
-                                      console.log('Profile image failed to load:', profileUrl);
-                                      e.target.style.display = 'none';
-                                      e.target.nextSibling.style.display = 'flex';
-                                    }}
-                                    onLoad={() => console.log('Profile image loaded successfully:', profileUrl)}
-                                  />
-                                ) : null;
-                              })()}
-                              <span style={{ display: getProfileImageUrl(user) ? 'none' : 'flex' }}>
-                                {getDisplayFirstChar(user)}
-                              </span>
-                            </div>
-                          <div className="comment-input-wrapper">
-                            <input
-                              type="text"
-                              placeholder="Write a comment..."
-                              value={commentText[post._id] || ''}
-                              onChange={(e) => setCommentText(prev => ({ ...prev, [post._id]: e.target.value }))}
-                              onKeyPress={(e) => e.key === 'Enter' && handleComment(post._id)}
-                              className="comment-input"
-                            />
-                            <button
-                              onClick={() => handleComment(post._id)}
-                              className="comment-submit-btn"
-                            >
-                              Post
-                            </button>
-                          </div>
+                          ))}
                         </div>
-
-                                                 {/* Comments List */}
-                         {post.comments && post.comments.length > 0 ? (
-                           <div className="comments-list">
-                             {post.comments.map((comment, index) => (
-                               <div key={index} className="comment-item">
-                                 <div className="comment-author">
-                                                                       <div 
-                                         className="comment-avatar clickable"
-                                         onClick={() => navigate(`/profile/${comment.author._id}`)}
-                                         title={`View ${getDisplayName(comment.author)}'s profile`}
-                                       >
-                                      {(() => {
-                                        const profileUrl = getProfileImageUrl(comment.author);
-                                        console.log('Comment author profile image URL:', profileUrl, 'Comment author object:', comment.author);
-                                        return profileUrl ? (
-                                          <img 
-                                            src={profileUrl} 
-                                            alt={getDisplayName(comment.author)}
-                                            onError={(e) => {
-                                              console.log('Comment author profile image failed to load:', profileUrl);
-                                              e.target.style.display = 'none';
-                                              e.target.nextSibling.style.display = 'flex';
-                                            }}
-                                            onLoad={() => console.log('Comment author profile image loaded successfully:', profileUrl)}
-                                          />
-                                        ) : null;
-                                      })()}
-                                      <span style={{ display: getProfileImageUrl(comment.author) ? 'none' : 'flex' }}>
-                                        {getDisplayFirstChar(comment.author)}
-                                      </span>
-                                    </div>
-                                   <div className="comment-info">
-                                     <span 
-                                       className="comment-name clickable"
-                                       onClick={() => navigate(`/profile/${comment.author._id}`)}
-                                       title={`View ${getDisplayName(comment.author)}'s profile`}
-                                     >
-                                       {getDisplayName(comment.author)}
-                                     </span>
-                                     <span className="comment-time">
-                                       {formatTimeAgo(comment.createdAt)}
-                                     </span>
-                                   </div>
-                                   <div className="comment-menu">
-                                     <button 
-                                       className="menu-btn"
-                                                                               onClick={() => {
-                                          const currentUserId = user?.userId || user?._id || user?.id;
-                                          console.log('Comment author ID:', comment.author._id, 'User ID:', currentUserId, 'User object:', user);
-                                          console.log('Match:', String(comment.author._id) === String(currentUserId));
-                                          setShowCommentMenu(prev => ({ ...prev, [comment._id]: !prev[comment._id] }));
-                                        }}
-                                     >
-                                       ⋮
-                                     </button>
-                                     {showCommentMenu[comment._id] && (
-                                       <div className="menu-dropdown">
-                                                                                   {String(comment.author._id) === String(user?.userId || user?._id || user?.id) ? (
-                                           <>
-                                             <button 
-                                               className="menu-item"
-                                               onClick={() => {
-                                                 setEditingComment(prev => ({ ...prev, [comment._id]: !prev[comment._id] }));
-                                                 if (!editingComment[comment._id]) {
-                                                   setEditCommentText(prev => ({ ...prev, [comment._id]: comment.content }));
-                                                 }
-                                                 setShowCommentMenu(prev => ({ ...prev, [comment._id]: false }));
-                                               }}
-                                             >
-                                               ✏️ Edit Comment
-                                             </button>
-                                             <button 
-                                               className="menu-item"
-                                               onClick={() => {
-                                                 handleDeleteComment(comment._id, post._id);
-                                                 setShowCommentMenu(prev => ({ ...prev, [comment._id]: false }));
-                                               }}
-                                             >
-                                               🗑️ Delete Comment
-                                             </button>
-                                           </>
-                                         ) : (
-                                           <>
-                                             <button 
-                                               className="menu-item"
-                                               onClick={() => handleReportComment(comment._id, getDisplayName(comment.author))}
-                                             >
-                                               🚨 Report Comment
-                                             </button>
-                                             <button 
-                                               className="menu-item"
-                                               onClick={() => handleBlockCommentUser(comment.author._id, getDisplayName(comment.author))}
-                                             >
-                                               🚫 Block User
-                                             </button>
-                                           </>
-                                         )}
-                                       </div>
-                                     )}
-                                   </div>
-                                 </div>
-                                 {editingComment[comment._id] ? (
-                                   <div className="comment-edit-container">
-                                     <input
-                                       type="text"
-                                       value={editCommentText[comment._id] || ''}
-                                       onChange={(e) => setEditCommentText(prev => ({ ...prev, [comment._id]: e.target.value }))}
-                                       className="comment-edit-input"
-                                       onKeyPress={(e) => e.key === 'Enter' && handleEditComment(comment._id, post._id)}
-                                     />
-                                     <div className="comment-edit-actions">
-                                       <button 
-                                         className="comment-edit-btn save"
-                                         onClick={() => handleEditComment(comment._id, post._id)}
-                                       >
-                                         Save
-                                       </button>
-                                       <button 
-                                         className="comment-edit-btn cancel"
-                                         onClick={() => {
-                                           setEditingComment(prev => ({ ...prev, [comment._id]: false }));
-                                           setEditCommentText(prev => ({ ...prev, [comment._id]: '' }));
-                                         }}
-                                       >
-                                         Cancel
-                                       </button>
-                                     </div>
-                                   </div>
-                                 ) : (
-                                   <p className="comment-content">{comment.content}</p>
-                                 )}
-                               </div>
-                             ))}
-                           </div>
-                         ) : (
-                           <p className="no-comments">No comments yet. Be the first to comment!</p>
-                         )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                      ) : (
+                        <p className="no-comments-modern">No comments yet. Be the first to comment!</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </section>
+      </div>
 
       {/* Create Post Modal */}
-      {showCreatePost && (
-        <div className="modal-overlay" onClick={() => setShowCreatePost(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
+      {modalVisible && (
+        <div className={`modal-overlay-modern ${showCreatePost ? 'show' : ''}`} onClick={() => setShowCreatePost(false)}>
+          <div className="modal-content-modern" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header-modern">
               <h2>Create Post</h2>
               <button 
-                className="close-btn"
+                className="close-btn-modern"
                 onClick={() => setShowCreatePost(false)}
               >
-                ✕
+                <i className="icon-close"></i>
               </button>
             </div>
             
-            <form onSubmit={handleCreatePost} className="post-form">
-              <div className="form-group">
+            <form onSubmit={handleCreatePost} className="post-form-modern">
+              <div className="form-group-modern">
                 <label htmlFor="content">What's on your mind?</label>
                 <textarea
                   id="content"
@@ -755,35 +789,37 @@ export default function SocialFeed() {
                   placeholder="Share your travel experiences, tips, or adventures..."
                   rows="4"
                   required
+                  className="form-textarea-modern"
                 />
-                <div className="char-count">
+                <div className="char-count-modern">
                   {newPost.content.length}/500
                 </div>
               </div>
 
-              <div className="form-group">
+              <div className="form-group-modern">
                 <label htmlFor="audience">Audience</label>
                 <select
                   id="audience"
                   value={newPost.audience}
                   onChange={(e) => setNewPost(prev => ({ ...prev, audience: e.target.value }))}
+                  className="form-select-modern"
                 >
                   <option value="worldwide">🌍 Worldwide - Share with all travelers</option>
                   <option value="nearby">📍 Nearby - Share with travelers in your country</option>
                 </select>
               </div>
 
-              <div className="form-actions">
+              <div className="form-actions-modern">
                 <button 
                   type="button" 
-                  className="cancel-btn"
+                  className="btn-secondary"
                   onClick={() => setShowCreatePost(false)}
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
-                  className="submit-btn"
+                  className="btn-primary"
                 >
                   Create Post
                 </button>

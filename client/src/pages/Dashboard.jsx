@@ -136,6 +136,15 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-container">
+      {/* Profile Navigation Button */}
+      <div className="profile-nav-section">
+        <button 
+          className="profile-nav-btn"
+          onClick={() => navigate('/profile')}
+        >
+          👤 View My Profile
+        </button>
+      </div>
 
       {/* KYC Verification Reminder - Only for unverified users */}
       {stats?.verificationStatus !== 'verified' && (

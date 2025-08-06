@@ -291,7 +291,8 @@ export default function UserProfile() {
                     </>
                   ) : (
                     <div className="profile-image-placeholder">
-                      {getInitials(user?.name || 'U')}
+                      <div className="default-avatar-icon">👤</div>
+                      <div className="default-avatar-text">{getInitials(user?.name || 'U')}</div>
                     </div>
                   )}
                   <label className="profile-upload-label">

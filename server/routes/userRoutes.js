@@ -5,6 +5,7 @@ import isAdmin from '../middlewares/isAdmin.js';
 import upload from '../middlewares/upload.js';
 import { body } from 'express-validator';
 import rateLimit from 'express-rate-limit';
+import User from '../models/User.js'; // Added import for User model
 
 // router.post('/create-trip', verifyToken, createTrip);
 // router.get('/my-profile', verifyToken, getProfile);
@@ -56,7 +57,35 @@ router.get('/dashboard/stats', verifyToken, getDashboardStats);
 router.get('/dashboard/trips', verifyToken, getDashboardTrips);
 
 router.get('/unverified', verifyToken, isAdmin, getUnverifiedUsers);
-router.get('/:id', getUserById);
+
+// Search users - must come before parameterized routes
+router.get('/search', verifyToken, async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.trim().length < 2) {
+      return res.status(400).json({ message: 'Search query must be at least 2 characters long' });
+    }
+
+    const searchQuery = new RegExp(q.trim(), 'i');
+    const users = await User.find({
+      $or: [
+        { username: searchQuery },
+        { name: searchQuery },
+        { email: searchQuery }
+      ],
+      _id: { $ne: req.user.userId } // Exclude current user
+    })
+    .select('username name email profileImage')
+    .limit(10);
+
+    res.json(users);
+  } catch (error) {
+    console.error('User search error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.get('/:id', verifyToken, getUserById);
 
 // User blocking/unblocking
 router.post('/:userId/block', verifyToken, blockUser);

@@ -379,14 +379,26 @@
   height: 250px !important;
   border-radius: 50%;
   border: 5px solid #10b981;
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  background: linear-gradient(135deg, #10b981, #059669);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 4.5rem;
-  font-weight: 700;
   color: #ffffff;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  position: relative;
+}
+
+.profile-image-placeholder .default-avatar-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.8;
+}
+
+.profile-image-placeholder .default-avatar-text {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .profile-upload-label {
@@ -696,7 +708,15 @@
   .profile-image-placeholder {
     width: 160px !important;
     height: 160px !important;
-    font-size: 3rem;
+  }
+  
+  .profile-image-placeholder .default-avatar-icon {
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .profile-image-placeholder .default-avatar-text {
+    font-size: 1.25rem;
   }
   
   .cover-upload-label {
