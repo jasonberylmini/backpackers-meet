@@ -17,8 +17,8 @@ const router = express.Router();
 
 // User notification routes
 router.get('/', verifyToken, getUserNotifications);
-router.patch('/:notificationId/read', verifyToken, markNotificationAsRead);
-router.patch('/read-all', verifyToken, markAllNotificationsAsRead);
+router.put('/:notificationId/read', verifyToken, markNotificationAsRead);
+router.put('/read-all', verifyToken, markAllNotificationsAsRead);
 router.delete('/:notificationId', verifyToken, deleteNotification);
 router.delete('/read/all', verifyToken, deleteAllReadNotifications);
 

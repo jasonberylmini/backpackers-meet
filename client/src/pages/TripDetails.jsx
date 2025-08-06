@@ -17,7 +17,7 @@ export default function TripDetails() {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'members', 'expenses'
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
+
   const [inviteUsername, setInviteUsername] = useState('');
   const [inviting, setInviting] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
@@ -161,7 +161,7 @@ export default function TripDetails() {
     } catch (error) {
       console.error('Failed to search users:', error);
       console.error('Error response:', error.response?.data);
-      toast.error('Failed to search users');
+      // Removed toast notification for search errors
     } finally {
       setSearching(false);
     }
@@ -178,7 +178,6 @@ export default function TripDetails() {
       console.log('User invited successfully');
       toast.success('Invitation sent successfully!');
       setShowInviteModal(false);
-      setInviteEmail('');
       setInviteUsername('');
       setSearchResults([]);
       fetchTripDetails(); // Refresh trip data
@@ -191,34 +190,7 @@ export default function TripDetails() {
     }
   };
 
-  const handleInviteByEmail = async () => {
-    if (!inviteEmail.trim()) {
-      toast.error('Please enter an email address');
-      return;
-    }
 
-    try {
-      setInviting(true);
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
-      
-      console.log('Inviting user by email:', inviteEmail);
-      await axios.post(`/api/trips/${tripId}/invite-email`, { email: inviteEmail }, { headers });
-      console.log('Email invitation sent successfully');
-      toast.success('Invitation sent successfully!');
-      setShowInviteModal(false);
-      setInviteEmail('');
-      setInviteUsername('');
-      setSearchResults([]);
-      fetchTripDetails(); // Refresh trip data
-    } catch (error) {
-      console.error('Failed to invite by email:', error);
-      console.error('Error response:', error.response?.data);
-      toast.error(error.response?.data?.message || 'Failed to send invitation');
-    } finally {
-      setInviting(false);
-    }
-  };
 
   const handleRemoveMember = async (memberId) => {
     if (!window.confirm('Are you sure you want to remove this member?')) return;
@@ -708,7 +680,7 @@ export default function TripDetails() {
                 <div className="search-input-group">
                   <input
                     type="text"
-                    placeholder="Search by username or name..."
+                    placeholder="Search by username..."
                     value={inviteUsername}
                     onChange={(e) => {
                       setInviteUsername(e.target.value);
@@ -720,7 +692,7 @@ export default function TripDetails() {
                 </div>
                 
                 <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
-                  Type at least 2 characters to search for users
+                  Type at least 2 characters to search by username
                 </div>
                 
                 <div style={{ marginTop: '5px', fontSize: '11px', color: '#999' }}>
@@ -747,7 +719,7 @@ export default function TripDetails() {
                           </div>
                           <div className="user-details">
                             <span className="user-name">{user.username || user.name}</span>
-                            <span className="user-email">{user.email}</span>
+                            <span className="user-place">{user.country || 'Location not set'}</span>
                           </div>
                         </div>
                         <button 
@@ -764,32 +736,13 @@ export default function TripDetails() {
                 
                 {inviteUsername.trim().length >= 2 && !searching && searchResults.length === 0 && (
                   <div className="no-results">
-                    <p>No users found matching "{inviteUsername}"</p>
-                    <p className="no-results-hint">Try searching by email or try the email invitation below</p>
+                    <p>No users found with username "{inviteUsername}"</p>
+                    <p className="no-results-hint">Try searching with a different username</p>
                   </div>
                 )}
               </div>
 
-              {/* Invite by Email Tab */}
-              <div className="invite-section">
-                <h4>Invite by Email</h4>
-                <div className="email-input-group">
-                  <input
-                    type="email"
-                    placeholder="Enter email address..."
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    className="email-input"
-                  />
-                  <button 
-                    className="invite-email-btn"
-                    onClick={handleInviteByEmail}
-                    disabled={inviting || !inviteEmail.trim()}
-                  >
-                    {inviting ? 'Sending...' : 'Send Invitation'}
-                  </button>
-                </div>
-              </div>
+
             </div>
           </div>
         </div>

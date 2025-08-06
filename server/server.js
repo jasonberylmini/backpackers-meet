@@ -20,6 +20,7 @@ import postRoutes from './routes/postRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import User from './models/User.js'; // Added for /test-user-profile endpoint
 import verifyToken from './middlewares/authMiddleware.js'; // Added for /test-user-profile endpoint
+import { setIO } from './utils/socketManager.js';
 
 dotenv.config();
 // Environment variable checks
@@ -159,6 +160,9 @@ const server = http.createServer(app);
 const io = new SocketIOServer(server, {
   cors: { origin: '*' }
 });
+
+// Set the global IO instance
+setIO(io);
 
 // Store connected users
 const connectedUsers = new Map(); // socketId -> { userId, name, rooms }

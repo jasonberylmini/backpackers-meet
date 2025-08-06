@@ -101,8 +101,8 @@ export const getProfileImageUrl = (user) => {
     }
     
     // If it's a relative path, construct the full URL
-    // Assuming the backend serves static files from /uploads/
-    return `/uploads/${user.profileImage}`;
+    // Backend serves static files from /uploads/ at localhost:5000
+    return `http://localhost:5000/uploads/${user.profileImage}`;
   }
   
   return null;

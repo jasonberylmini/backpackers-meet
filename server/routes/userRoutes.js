@@ -68,14 +68,10 @@ router.get('/search', verifyToken, async (req, res) => {
 
     const searchQuery = new RegExp(q.trim(), 'i');
     const users = await User.find({
-      $or: [
-        { username: searchQuery },
-        { name: searchQuery },
-        { email: searchQuery }
-      ],
+      username: searchQuery,
       _id: { $ne: req.user.userId } // Exclude current user
     })
-    .select('username name email profileImage')
+    .select('username name country profileImage')
     .limit(10);
 
     res.json(users);

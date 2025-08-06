@@ -12,8 +12,7 @@ export default function UserNavigation() {
     { path: '/social', label: 'Social Feed', icon: '🏠' },
     { path: '/trips/browse', label: 'Discover Trips', icon: '🧳' },
     { path: '/trips/create', label: 'My Trips', icon: '➕' },
-    { path: '/expenses', label: 'Expenses', icon: '💰' },
-    { path: '/notifications', label: 'Notifications', icon: '🔔' },
+    { path: '/expenses', label: 'Expenses', icon: '��' },
     { path: '/profile', label: 'Profile', icon: '👤' },
     { path: '/kyc', label: 'KYC Verification', icon: '📋' }
   ];

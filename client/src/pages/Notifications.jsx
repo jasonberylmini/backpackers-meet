@@ -93,7 +93,7 @@ export default function Notifications() {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
       
-      await axios.put('/api/notifications/mark-all-read', {}, { headers });
+      await axios.put('/api/notifications/read-all', {}, { headers });
       
       // Update local state
       setNotifications(prev => 
@@ -127,19 +127,55 @@ export default function Notifications() {
   };
 
   const clearAllNotifications = async () => {
-    if (!window.confirm('Are you sure you want to clear all notifications?')) return;
-    
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
       
-      await axios.delete('/api/notifications/clear-all', { headers });
+      await axios.delete('/api/notifications/read/all', { headers });
       
-      setNotifications([]);
-      toast.success('All notifications cleared');
+      // Update local state - remove all read notifications
+      setNotifications(prev => prev.filter(notification => !notification.read));
+      
+      toast.success('All read notifications cleared');
     } catch (error) {
-      console.error('Failed to clear all notifications:', error);
-      toast.error('Failed to clear all notifications');
+      console.error('Failed to clear notifications:', error);
+      toast.error('Failed to clear notifications');
+    }
+  };
+
+  const acceptInvitation = async (notification) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.post(`/api/trips/${notification.data.tripId}/accept-invitation`, {}, { headers });
+      
+      // Mark notification as read and remove from list
+      await markAsRead(notification._id);
+      setNotifications(prev => prev.filter(n => n._id !== notification._id));
+      
+      toast.success('Invitation accepted!');
+    } catch (error) {
+      console.error('Failed to accept invitation:', error);
+      toast.error(error.response?.data?.message || 'Failed to accept invitation');
+    }
+  };
+
+  const declineInvitation = async (notification) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.post(`/api/trips/${notification.data.tripId}/decline-invitation`, {}, { headers });
+      
+      // Mark notification as read and remove from list
+      await markAsRead(notification._id);
+      setNotifications(prev => prev.filter(n => n._id !== notification._id));
+      
+      toast.success('Invitation declined');
+    } catch (error) {
+      console.error('Failed to decline invitation:', error);
+      toast.error(error.response?.data?.message || 'Failed to decline invitation');
     }
   };
 
@@ -204,15 +240,22 @@ export default function Notifications() {
     // Navigate based on notification type
     switch (notification.type) {
       case 'trip':
-        if (notification.tripId) {
-          navigate(`/trips/${notification.tripId}`);
+        if (notification.data?.tripId) {
+          navigate(`/trips/${notification.data.tripId}`);
+        } else {
+          navigate('/trips/browse');
+        }
+        break;
+      case 'invitation':
+        if (notification.data?.tripId) {
+          navigate(`/trips/${notification.data.tripId}`);
         } else {
           navigate('/trips/browse');
         }
         break;
       case 'message':
-        if (notification.chatId) {
-          navigate(`/chat/${notification.chatId}`);
+        if (notification.data?.chatId) {
+          navigate(`/chat/${notification.data.chatId}`);
         } else {
           navigate('/social');
         }
@@ -372,7 +415,59 @@ export default function Notifications() {
                 </div>
                 
                 <div className="notification-actions">
-                  {!notification.read && (
+                  {notification.type === 'invitation' && !notification.read && (
+                    <>
+                      <button 
+                        className="accept-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          acceptInvitation(notification);
+                        }}
+                        title="Accept invitation"
+                        style={{ 
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '36px',
+                          height: '36px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1rem',
+                          fontWeight: '600'
+                        }}
+                      >
+                        ✓
+                      </button>
+                      <button 
+                        className="decline-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          declineInvitation(notification);
+                        }}
+                        title="Decline invitation"
+                        style={{ 
+                          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '36px',
+                          height: '36px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1rem',
+                          fontWeight: '600'
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </>
+                  )}
+                  {notification.type !== 'invitation' && !notification.read && (
                     <button 
                       className="mark-read-btn"
                       onClick={(e) => {
@@ -402,4 +497,4 @@ export default function Notifications() {
       </section>
     </div>
   );
-} 
+}

@@ -15,6 +15,7 @@ import SocialFeed from './pages/SocialFeed';
 import Messages from './pages/Messages';
 import AccountSettings from './pages/AccountSettings';
 import Notifications from './pages/Notifications';
+
 import KYCVerification from './pages/KYCVerification';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
@@ -139,6 +140,7 @@ function AppRoutes() {
             </UserLayout>
           </ProtectedRoute>
         } />
+
         <Route path="/kyc" element={
           <ProtectedRoute>
             <UserLayout>

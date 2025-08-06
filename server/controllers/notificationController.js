@@ -1,6 +1,7 @@
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
 import { sendNotification } from '../utils/sendNotification.js';
+import { emitToUser } from '../utils/socketManager.js';
 import winston from 'winston';
 
 const logger = winston.createLogger({
@@ -20,8 +21,9 @@ export const getUserNotifications = async (req, res) => {
     const skip = (Number(page) - 1) * Number(limit);
     
     const notifications = await Notification.find(filter)
-      .populate('sentBy', 'name email')
-      .populate('relatedTrip', 'destination startDate')
+      .populate('sentBy', 'name email username')
+      .populate('relatedTrip', 'destination startDate endDate')
+      .populate('data.tripId', 'destination startDate endDate')
       .populate('relatedReview', 'feedback')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -30,13 +32,8 @@ export const getUserNotifications = async (req, res) => {
     const total = await Notification.countDocuments(filter);
     const unreadCount = await Notification.countDocuments({ user: userId, read: false });
     
-    res.status(200).json({
-      notifications,
-      total,
-      unreadCount,
-      page: Number(page),
-      limit: Number(limit)
-    });
+    // Return notifications in the format expected by frontend
+    res.status(200).json(notifications);
   } catch (err) {
     logger.error('Get User Notifications Error:', err);
     res.status(500).json({ message: 'Server error' });
@@ -58,6 +55,9 @@ export const markNotificationAsRead = async (req, res) => {
     if (!notification) {
       return res.status(404).json({ message: 'Notification not found.' });
     }
+    
+    // Emit real-time update
+    emitToUser(userId, 'notificationUpdated', notification);
     
     res.status(200).json({
       message: 'Notification marked as read.',
