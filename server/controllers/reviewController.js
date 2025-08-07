@@ -13,6 +13,35 @@ async function isTripParticipant(tripId, userId) {
   );
 }
 
+// Helper: Check if trip is completed
+async function isTripCompleted(tripId) {
+  const trip = await Trip.findById(tripId);
+  if (!trip) return false;
+  return trip.status === 'completed';
+}
+
+// Helper: Check if user can review another user (both must be trip members)
+async function canReviewUser(tripId, reviewerId, reviewedUserId) {
+  const trip = await Trip.findById(tripId);
+  if (!trip) return false;
+  
+  // Both users must be trip members
+  const isReviewerMember = trip.creator.equals(reviewerId) || 
+                          trip.members.some(memberId => memberId.equals(reviewerId));
+  const isReviewedUserMember = trip.creator.equals(reviewedUserId) || 
+                              trip.members.some(memberId => memberId.equals(reviewedUserId));
+  
+  return isReviewerMember && isReviewedUserMember;
+}
+
+// Helper: Get trip details for validation
+async function getTripDetails(tripId) {
+  const trip = await Trip.findById(tripId)
+    .populate('creator', 'name email')
+    .populate('members', 'name email');
+  return trip;
+}
+
 // Automated review moderation checks
 function runAutomatedChecks(feedback, rating) {
   const issues = [];
@@ -77,6 +106,7 @@ export const giveReview = async (req, res) => {
     const { reviewType, tripId, reviewedUser, rating, feedback, tags } = req.body;
     const reviewer = req.user.userId;
 
+    // Basic validation
     if (!reviewType || !rating || !feedback) {
       return res.status(400).json({ message: 'Missing required fields.' });
     }
@@ -87,18 +117,67 @@ export const giveReview = async (req, res) => {
       return res.status(400).json({ message: 'Reviewed user required for user reviews.' });
     }
 
-    // Validate trip participation for trip/user reviews
-    if (tripId) {
-      const isParticipant = await isTripParticipant(tripId, reviewer);
-      if (!isParticipant) {
-        return res.status(403).json({ message: 'You can only review trips you participated in.' });
+    // For both trip and user reviews, we need a tripId to validate completion and membership
+    if (!tripId) {
+      return res.status(400).json({ message: 'Trip ID is required for all reviews.' });
+    }
+
+    // Get trip details for validation
+    const trip = await getTripDetails(tripId);
+    if (!trip) {
+      return res.status(404).json({ message: 'Trip not found.' });
+    }
+
+    // RESTRICTION 1: Only after completing a trip can users post reviews
+    if (trip.status !== 'completed') {
+      return res.status(403).json({ 
+        message: 'You can only review after the trip is completed.',
+        tripStatus: trip.status
+      });
+    }
+
+    // RESTRICTION 2: Only trip members can review each other (not anyone else)
+    const isReviewerMember = await isTripParticipant(tripId, reviewer);
+    if (!isReviewerMember) {
+      return res.status(403).json({ 
+        message: 'You can only review trips you participated in.',
+        tripDestination: trip.destination
+      });
+    }
+
+    if (reviewType === 'user') {
+      // RESTRICTION 3: Users cannot review themselves
+      if (reviewer === reviewedUser) {
+        return res.status(400).json({ 
+          message: 'You cannot review yourself.',
+          reviewerId: reviewer,
+          reviewedUserId: reviewedUser
+        });
+      }
+
+      // RESTRICTION 4: Only trip members can review each other
+      const canReview = await canReviewUser(tripId, reviewer, reviewedUser);
+      if (!canReview) {
+        return res.status(403).json({ 
+          message: 'You can only review other members of the same trip.',
+          tripDestination: trip.destination,
+          tripMembers: trip.members.map(m => ({ id: m._id, name: m.name }))
+        });
       }
     }
 
-    // Prevent duplicate reviews (enforced by schema index, but check for user-friendly error)
-    const duplicate = await Review.findOne({ reviewer, reviewType, tripId: tripId || null, reviewedUser: reviewedUser || null });
+    // Check for duplicate reviews
+    const duplicate = await Review.findOne({ 
+      reviewer, 
+      reviewType, 
+      tripId, 
+      reviewedUser: reviewedUser || null 
+    });
     if (duplicate) {
-      return res.status(409).json({ message: 'You have already submitted a review.' });
+      return res.status(409).json({ 
+        message: 'You have already submitted a review for this trip/user combination.',
+        existingReviewId: duplicate._id
+      });
     }
 
     // Run automated moderation checks
@@ -114,7 +193,7 @@ export const giveReview = async (req, res) => {
     const newReview = new Review({
       reviewer,
       reviewType,
-      tripId: tripId || undefined,
+      tripId,
       reviewedUser: reviewedUser || undefined,
       rating,
       feedback,
@@ -123,6 +202,24 @@ export const giveReview = async (req, res) => {
       adminResponse
     });
     await newReview.save();
+    
+    // If this is a user review and it's approved, automatically add as friends
+    if (reviewType === 'user' && reviewedUser && status === 'approved') {
+      try {
+        // Add reviewedUser to reviewer's friends list
+        await User.findByIdAndUpdate(reviewer, {
+          $addToSet: { friends: reviewedUser }
+        });
+        
+        // Add reviewer to reviewedUser's friends list
+        await User.findByIdAndUpdate(reviewedUser, {
+          $addToSet: { friends: reviewer }
+        });
+      } catch (friendError) {
+        console.error('Error adding friends:', friendError);
+        // Don't fail the review submission if friend addition fails
+      }
+    }
     
     const responseMessage = status === 'approved' 
       ? 'Review submitted and published.' 
@@ -358,6 +455,90 @@ export const deleteReview = async (req, res) => {
     res.status(200).json({ message: 'Review deleted.' });
   } catch (err) {
     console.error('❌ Delete Review Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Check review permissions for frontend
+export const checkReviewPermissions = async (req, res) => {
+  try {
+    const { reviewType, tripId, reviewedUser } = req.query;
+    const userId = req.user.userId;
+
+    if (!reviewType || !tripId) {
+      return res.status(400).json({ message: 'Review type and trip ID are required.' });
+    }
+
+    // Get trip details
+    const trip = await getTripDetails(tripId);
+    if (!trip) {
+      return res.status(404).json({ message: 'Trip not found.' });
+    }
+
+    const permissions = {
+      canReview: false,
+      reason: '',
+      tripStatus: trip.status,
+      isTripMember: false,
+      tripCompleted: trip.status === 'completed'
+    };
+
+    // Check if user is a trip member
+    const isTripMember = await isTripParticipant(tripId, userId);
+    permissions.isTripMember = isTripMember;
+
+    // Check trip completion
+    if (trip.status !== 'completed') {
+      permissions.reason = 'Trip must be completed before reviews can be submitted.';
+      return res.status(200).json(permissions);
+    }
+
+    // Check trip membership
+    if (!isTripMember) {
+      permissions.reason = 'You must be a trip member to submit reviews.';
+      return res.status(200).json(permissions);
+    }
+
+    // For user reviews, check additional restrictions
+    if (reviewType === 'user') {
+      if (!reviewedUser) {
+        permissions.reason = 'Reviewed user is required for user reviews.';
+        return res.status(200).json(permissions);
+      }
+
+      // Check if user is trying to review themselves
+      if (userId === reviewedUser) {
+        permissions.reason = 'You cannot review yourself.';
+        return res.status(200).json(permissions);
+      }
+
+      // Check if reviewed user is also a trip member
+      const canReviewUser = await canReviewUser(tripId, userId, reviewedUser);
+      if (!canReviewUser) {
+        permissions.reason = 'You can only review other members of the same trip.';
+        return res.status(200).json(permissions);
+      }
+    }
+
+    // Check if user has already reviewed
+    const existingReview = await Review.findOne({
+      reviewer: userId,
+      reviewType,
+      tripId,
+      reviewedUser: reviewedUser || null
+    });
+
+    if (existingReview) {
+      permissions.reason = 'You have already submitted a review for this trip/user combination.';
+      return res.status(200).json(permissions);
+    }
+
+    // All checks passed
+    permissions.canReview = true;
+    res.status(200).json(permissions);
+
+  } catch (err) {
+    console.error('❌ Check Review Permissions Error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };

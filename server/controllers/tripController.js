@@ -261,4 +261,45 @@ export const deleteTrip = async (req, res) => {
   }
 };
 
+// Get completed trips where both current user and another user participated
+export const getCompletedTripsWithUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user.userId;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required.' });
+    }
+
+    // Find trips where:
+    // 1. Trip status is 'completed'
+    // 2. Current user is creator or member
+    // 3. Target user is creator or member
+    const trips = await Trip.find({
+      status: 'completed',
+      $or: [
+        { creator: currentUserId },
+        { members: currentUserId }
+      ],
+      $and: [
+        {
+          $or: [
+            { creator: userId },
+            { members: userId }
+          ]
+        }
+      ]
+    })
+    .populate('creator', 'name email profileImage username')
+    .populate('members', 'name email profileImage username')
+    .select('destination startDate endDate budget tripType description images')
+    .sort({ endDate: -1 });
+
+    res.status(200).json(trips);
+  } catch (err) {
+    logger.error("Fetch completed trips with user error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 

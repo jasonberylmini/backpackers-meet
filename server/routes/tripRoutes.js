@@ -9,7 +9,8 @@ import {
   browseTrips, 
   leaveTrip, 
   updateTrip, 
-  deleteTrip 
+  deleteTrip,
+  getCompletedTripsWithUser
 } from '../controllers/tripController.js';
 import { sendNotification } from '../utils/sendNotification.js';
 import Trip from '../models/Trip.js';
@@ -24,6 +25,7 @@ const router = express.Router();
 router.post('/create', verifyToken, upload.single('image'), createTrip);
 router.get('/mine', verifyToken, getMyTrips);
 router.get('/browse', verifyToken, browseTrips);
+router.get('/completed-with-user/:userId', verifyToken, getCompletedTripsWithUser);
 router.get('/:tripId', verifyToken, getTripById);
 router.post('/join/:tripId', verifyToken, joinTrip);
 router.post('/leave/:tripId', verifyToken, leaveTrip);

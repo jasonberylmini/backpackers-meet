@@ -96,6 +96,7 @@ const userSchema = new mongoose.Schema({
   instagram: { type: String, default: '' },
   languages: [{ type: String }],
   blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 
 });
 

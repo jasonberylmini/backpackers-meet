@@ -14,6 +14,7 @@ const reviewSchema = new mongoose.Schema({
   tripId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Trip',
+    required: true
   },
   reviewedUser: {
     type: mongoose.Schema.Types.ObjectId,

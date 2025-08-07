@@ -4,6 +4,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import './ProfileView.css';
 import { getDisplayName, getDisplayInitials } from '../utils/userDisplay';
+import ReviewsList from '../components/ReviewsList';
 
 export default function ProfileView() {
   const [user, setUser] = useState(null);
@@ -13,6 +14,7 @@ export default function ProfileView() {
   const [posts, setPosts] = useState([]);
   const [trips, setTrips] = useState([]);
   const [friends, setFriends] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [editingPost, setEditingPost] = useState(null);
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
@@ -33,6 +35,7 @@ export default function ProfileView() {
     if (user) {
       fetchUserPosts();
       fetchUserTrips();
+      fetchUserReviews();
       if (isOwnProfile) {
         fetchUserFriends();
       }
@@ -99,15 +102,26 @@ export default function ProfileView() {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
       
-      if (isOwnProfile) {
-        const response = await axios.get('/api/users/friends', { headers });
-        setFriends(response.data);
-      } else {
-        setFriends([]);
-      }
+      const targetUserId = userId || user?._id;
+      const response = await axios.get(`/api/users/${targetUserId}/friends`, { headers });
+      setFriends(response.data.friends || []);
     } catch (error) {
       console.error('Failed to fetch friends:', error);
       setFriends([]);
+    }
+  };
+
+  const fetchUserReviews = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const targetUserId = userId || user?._id;
+      const response = await axios.get(`/api/reviews/user/${targetUserId}`, { headers });
+      setReviews(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch reviews:', error);
+      setReviews([]);
     }
   };
 
@@ -298,16 +312,16 @@ export default function ProfileView() {
             <div className="profile-stats">
               <div className="stat-card">
                 <span className="stat-number">{trips.length}</span>
-                <span className="stat-label">Trips</span>
+                <span className="stat-label">TRIPS</span>
               </div>
               <div className="stat-card">
                 <span className="stat-number">{posts.length}</span>
-                <span className="stat-label">Posts</span>
+                <span className="stat-label">POSTS</span>
               </div>
               {isOwnProfile && (
                 <div className="stat-card">
                   <span className="stat-number">{friends.length}</span>
-                  <span className="stat-label">Friends</span>
+                  <span className="stat-label">FRIENDS</span>
                 </div>
               )}
             </div>
@@ -382,6 +396,14 @@ export default function ProfileView() {
               <span className="tab-count">{friends.length}</span>
             </button>
           )}
+          <button 
+            className={`tab-button ${activeTab === 'reviews' ? 'active' : ''}`}
+            onClick={() => setActiveTab('reviews')}
+          >
+            <i className="icon-reviews"></i>
+            Reviews
+            <span className="tab-count">{reviews.length}</span>
+          </button>
         </div>
       </div>
 
@@ -613,6 +635,43 @@ export default function ProfileView() {
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'reviews' && (
+            <div className="reviews-content">
+              <div className="user-reviews-header">
+                <h3>User Reviews</h3>
+                <div className="reviews-info">
+                  <p>Reviews from completed trips where both users were participants.</p>
+                </div>
+              </div>
+              
+              <ReviewsList
+                reviewType="user"
+                userId={userId || user?._id}
+                tripId={null} // Will be set when user selects a specific trip
+                showReviewForm={false}
+                onReviewSubmitted={(review) => {
+                  toast.success('Review submitted successfully!');
+                  fetchUserReviews(); // Refresh reviews
+                }}
+              />
+              
+              <div className="user-reviews-notice">
+                <div className="notice-content">
+                  <i className="icon-info"></i>
+                  <div>
+                    <h4>Review Guidelines</h4>
+                    <ul>
+                      <li>Reviews are only available for completed trips</li>
+                      <li>You can only review other trip members</li>
+                      <li>You cannot review yourself</li>
+                      <li>Each user can only be reviewed once per trip</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

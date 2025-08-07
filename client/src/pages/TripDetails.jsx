@@ -4,6 +4,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useSocket } from '../contexts/SocketContext';
 import { getProfileImageUrl, getDisplayFirstChar } from '../utils/userDisplay';
+import ReviewsList from '../components/ReviewsList';
 import './TripDetails.css';
 
 export default function TripDetails() {
@@ -404,6 +405,13 @@ export default function TripDetails() {
               <span className="tab-icon">💰</span>
               <span className="tab-label">Expenses</span>
             </button>
+            <button
+              className={`tab-nav-btn ${activeTab === 'reviews' ? 'active' : ''}`}
+              onClick={() => setActiveTab('reviews')}
+            >
+              <span className="tab-icon">⭐</span>
+              <span className="tab-label">Reviews</span>
+            </button>
           </div>
         </section>
 
@@ -602,6 +610,137 @@ export default function TripDetails() {
                   Add First Expense
                 </button>
               </div>
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'reviews' && (
+          <section className="reviews-section">
+            <div className="reviews-container">
+              {/* Trip Reviews */}
+              <div className="trip-reviews-section">
+                <h3 className="reviews-section-title">Trip Reviews</h3>
+                {loading ? (
+                  <div className="loading-reviews">
+                    <div className="loading-spinner"></div>
+                    <p>Loading trip data...</p>
+                  </div>
+                ) : trip ? (
+                  <ReviewsList
+                    reviewType="trip"
+                    tripId={tripId}
+                    trip={trip}
+                    showReviewForm={trip?.status === 'completed'}
+                    onReviewSubmitted={(review) => {
+                      toast.success('Trip review submitted successfully!');
+                    }}
+                  />
+                ) : (
+                  <div className="error-reviews">
+                    <p>Failed to load trip data. Please refresh the page.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Member Reviews - Only show if trip is completed */}
+              {!loading && trip && trip.status === 'completed' && (
+                <div className="member-reviews-section">
+                  <h3 className="reviews-section-title">Member Reviews</h3>
+                  <p className="member-reviews-description">
+                    Review other trip members based on your experience together.
+                  </p>
+                  
+                  <div className="member-reviews-grid">
+                    {/* Creator Reviews - Only show if not the current user */}
+                    {trip.creator && user && trip.creator._id !== (user.id || user._id || user.userId) && (
+                      <div className="member-review-card">
+                        <div className="member-info">
+                          <div className="member-avatar">
+                            {trip.creator.profileImage ? (
+                              <img 
+                                src={trip.creator.profileImage} 
+                                alt={trip.creator.firstName} 
+                                className="member-image"
+                              />
+                            ) : (
+                              <div className="member-placeholder">
+                                {trip.creator.firstName?.charAt(0) || 'U'}
+                              </div>
+                            )}
+                          </div>
+                          <div className="member-details">
+                            <h4 className="member-name">
+                              {trip.creator.firstName} {trip.creator.lastName}
+                              <span className="member-role">(Creator)</span>
+                            </h4>
+                            <p className="member-username">@{trip.creator.username}</p>
+                          </div>
+                        </div>
+                        <ReviewsList
+                          reviewType="user"
+                          userId={trip.creator._id}
+                          tripId={tripId}
+                          showReviewForm={false}
+                          onReviewSubmitted={(review) => {
+                            toast.success(`Review submitted for ${trip.creator.firstName}!`);
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Member Reviews - Only show if not the current user */}
+                    {trip.members && trip.members
+                      .filter(member => user && member._id !== (user.id || user._id || user.userId))
+                      .map(member => (
+                        <div key={member._id} className="member-review-card">
+                          <div className="member-info">
+                            <div className="member-avatar">
+                              {member.profileImage ? (
+                                <img 
+                                  src={member.profileImage} 
+                                  alt={member.firstName} 
+                                  className="member-image"
+                                />
+                              ) : (
+                                <div className="member-placeholder">
+                                  {member.firstName?.charAt(0) || 'U'}
+                                </div>
+                              )}
+                            </div>
+                            <div className="member-details">
+                              <h4 className="member-name">
+                                {member.firstName} {member.lastName}
+                                <span className="member-role">(Member)</span>
+                              </h4>
+                              <p className="member-username">@{member.username}</p>
+                            </div>
+                          </div>
+                          <ReviewsList
+                            reviewType="user"
+                            userId={member._id}
+                            tripId={tripId}
+                            showReviewForm={false}
+                            onReviewSubmitted={(review) => {
+                              toast.success(`Review submitted for ${member.firstName}!`);
+                            }}
+                          />
+                        </div>
+                      ))}
+
+                    {/* Show message when no members to review */}
+                    {((!trip.creator || (user && trip.creator._id === (user.id || user._id || user.userId))) && 
+                      (!trip.members || trip.members.filter(member => user && member._id !== (user.id || user._id || user.userId)).length === 0)) && (
+                      <div className="no-members-to-review">
+                        <div className="no-members-icon">
+                          <i className="icon-users"></i>
+                        </div>
+                        <h4>No Members to Review</h4>
+                        <p>You are the only member of this trip, so there are no other members to review.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         )}

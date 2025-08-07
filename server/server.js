@@ -217,79 +217,56 @@ io.on('connection', (socket) => {
     console.log(`👨‍💼 Admin ${socket.userName} left admin room`);
   });
 
-  // Join a chat room (trip or personal)
-  socket.on('joinRoom', (roomId) => {
-    socket.join(roomId);
+  // Join a chat room
+  socket.on('joinChat', (data) => {
+    const { chatId } = data;
+    socket.join(`chat_${chatId}`);
     const user = connectedUsers.get(socket.id);
     if (user) {
-      user.rooms.add(roomId);
+      user.rooms.add(`chat_${chatId}`);
     }
-    console.log(`👥 ${socket.userName} joined room: ${roomId}`);
+    console.log(`👥 ${socket.userName} joined chat: ${chatId}`);
     
-    // Notify others in the room
-    socket.to(roomId).emit('userJoined', {
+    // Emit user online status
+    socket.to(`chat_${chatId}`).emit('userOnline', {
       userId: socket.userId,
-      name: socket.userName,
       timestamp: new Date()
     });
   });
 
   // Leave a chat room
-  socket.on('leaveRoom', (roomId) => {
-    socket.leave(roomId);
+  socket.on('leaveChat', (data) => {
+    const { chatId } = data;
+    socket.leave(`chat_${chatId}`);
     const user = connectedUsers.get(socket.id);
     if (user) {
-      user.rooms.delete(roomId);
+      user.rooms.delete(`chat_${chatId}`);
     }
-    console.log(`👋 ${socket.userName} left room: ${roomId}`);
+    console.log(`👋 ${socket.userName} left chat: ${chatId}`);
     
-    // Notify others in the room
-    socket.to(roomId).emit('userLeft', {
+    // Emit user offline status
+    socket.to(`chat_${chatId}`).emit('userOffline', {
       userId: socket.userId,
-      name: socket.userName,
       timestamp: new Date()
     });
-  });
-
-  // Send message to a room
-  socket.on('sendMessage', (data) => {
-    const { roomId, text, type = 'text', replyTo, attachments } = data;
-    
-    const messageData = {
-      roomId,
-      sender: {
-        id: socket.userId,
-        name: socket.userName
-      },
-      text,
-      type,
-      replyTo,
-      attachments,
-      timestamp: new Date()
-    };
-
-    // Broadcast to room
-    io.to(roomId).emit('receiveMessage', messageData);
-    console.log(`💬 ${socket.userName} sent message to ${roomId}: ${text.substring(0, 50)}...`);
   });
 
   // Typing indicator
   socket.on('typing', (data) => {
-    const { roomId, isTyping } = data;
-    socket.to(roomId).emit('userTyping', {
+    const { chatId } = data;
+    socket.to(`chat_${chatId}`).emit('userTyping', {
       userId: socket.userId,
-      name: socket.userName,
-      isTyping,
+      chatId,
       timestamp: new Date()
     });
   });
 
-  // Mark messages as read
-  socket.on('markAsRead', (data) => {
-    const { roomId, messageIds } = data;
-    socket.to(roomId).emit('messagesRead', {
+  // Stop typing indicator
+  socket.on('stopTyping', (data) => {
+    const { chatId } = data;
+    socket.to(`chat_${chatId}`).emit('userStoppedTyping', {
       userId: socket.userId,
-      messageIds,
+      chatId,
       timestamp: new Date()
     });
   });

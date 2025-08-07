@@ -1,16 +1,15 @@
 import express from 'express';
-import { giveReview, getUserReviews, getTripReviews, deleteReview, getAllReviews, flagReview, unflagReview, getReviewsForModeration } from '../controllers/reviewController.js';
+import { giveReview, getUserReviews, getTripReviews, deleteReview, getAllReviews, flagReview, unflagReview, getReviewsForModeration, checkReviewPermissions } from '../controllers/reviewController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
 router.post('/submit', verifyToken, giveReview);
-router.get('/user/:userId', verifyToken, getUserReviews);
+router.get('/permissions', verifyToken, checkReviewPermissions);
 router.get('/trip/:tripId', verifyToken, getTripReviews);
-router.get('/all', verifyToken, getAllReviews); // Admin: get all reviews with filters
-router.get('/moderation', verifyToken, getReviewsForModeration); // Admin: get reviews needing moderation
-router.post('/:reviewId/flag', verifyToken, flagReview); // User: flag a review
-router.post('/:reviewId/unflag', verifyToken, unflagReview); // User: unflag a review
-router.delete('/:reviewId', verifyToken, deleteReview); // TODO: restrict to admin
+router.get('/user/:userId', verifyToken, getUserReviews);
+router.delete('/:reviewId', verifyToken, deleteReview);
+router.post('/:reviewId/flag', verifyToken, flagReview);
+router.delete('/:reviewId/flag', verifyToken, unflagReview);
 
 export default router;

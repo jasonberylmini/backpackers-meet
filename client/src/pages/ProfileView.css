@@ -232,7 +232,8 @@
   color: #64748b;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
+  margin-top: 0.25rem;
 }
 
 /* Profile Actions */
@@ -616,6 +617,71 @@
   min-height: 400px;
 }
 
+/* Reviews Content */
+.reviews-content {
+  min-height: 400px;
+}
+
+/* User Reviews Section */
+.user-reviews-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.user-reviews-header h3 {
+  margin: 0 0 8px 0;
+  color: #495057;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.reviews-info p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.user-reviews-notice {
+  margin-top: 24px;
+  padding: 16px;
+  background: #e7f3ff;
+  border: 1px solid #b3d9ff;
+  border-radius: 8px;
+}
+
+.notice-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.notice-content i {
+  color: #0066cc;
+  font-size: 18px;
+  margin-top: 2px;
+}
+
+.notice-content h4 {
+  margin: 0 0 8px 0;
+  color: #0066cc;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.notice-content ul {
+  margin: 0;
+  padding-left: 16px;
+  color: #0066cc;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.notice-content li {
+  margin-bottom: 4px;
+}
+
 .friends-grid-modern {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -731,6 +797,7 @@
 .icon-posts::before { content: "📝"; }
 .icon-trips::before { content: "🗓️"; }
 .icon-friends::before { content: "👥"; }
+.icon-reviews::before { content: "⭐"; }
 .icon-edit-small::before { content: "✏️"; }
 .icon-delete::before { content: "🗑️"; }
 .icon-map::before { content: "🗺️"; }

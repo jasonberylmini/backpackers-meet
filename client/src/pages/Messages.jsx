@@ -1,1118 +1,528 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSocket } from '../contexts/SocketContext';
-import toast from 'react-hot-toast';
+import { getProfileImageUrl, getDisplayName } from '../utils/userDisplay';
+import axios from 'axios';
 import './Messages.css';
 
 export default function Messages() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { socket, isConnected, joinRoom, leaveRoom } = useSocket();
+  const { socket, isConnected } = useSocket();
   
-  const [activeTab, setActiveTab] = useState('personal');
+  // State management
+  const [currentUser, setCurrentUser] = useState(null);
+  const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
-  const [chatMessages, setChatMessages] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [user, setUser] = useState(null);
-  const [isTyping, setIsTyping] = useState(false);
-  const [showPinnedInfo, setShowPinnedInfo] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [editingMessage, setEditingMessage] = useState(null);
-  const [editText, setEditText] = useState('');
-  const [showMessageOptions, setShowMessageOptions] = useState(null);
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'personal', 'group'
 
-  // Real chat data
-  const [personalChats, setPersonalChats] = useState([]);
-  const [groupChats, setGroupChats] = useState([]);
-  const [showChatActions, setShowChatActions] = useState(false);
-  const [showUserActions, setShowUserActions] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-
+  // Initialize user data
   useEffect(() => {
+    try {
     const userData = localStorage.getItem('user');
     if (userData) {
-      setUser(JSON.parse(userData));
+        const user = JSON.parse(userData);
+        setCurrentUser(user);
+        console.log('User loaded:', user);
+      } else {
+        console.log('No user data found');
+        setError('No user data found');
+      }
+    } catch (err) {
+      console.error('Error loading user data:', err);
+      setError('Error loading user data');
     }
-    // Scroll to top when component mounts
-    window.scrollTo(0, 0);
   }, []);
 
-  // Socket event listeners for real-time messaging
+  // Load chats when user is available
   useEffect(() => {
-    if (!socket || !isConnected) return;
+    if (!currentUser) return;
 
-    const handleNewMessage = (data) => {
-      if (selectedChat && data.roomId === selectedChat._id) {
-        // Convert socket message format to our message format
-        const message = {
-          _id: Date.now().toString(), // Temporary ID
-          text: data.text,
-          sender: {
-            _id: data.sender.id,
-            username: data.sender.name,
-            name: data.sender.name
-          },
-          sentAt: data.timestamp,
-          type: data.type || 'text'
-        };
-        setChatMessages(prev => [...prev, message]);
-      }
-      // Update chat list with new message
-      fetchUserChats();
-    };
-
-    // Note: Server doesn't have socket handlers for message editing/deletion
-    // These are handled via HTTP API calls only
-
-    const handleUserTyping = (data) => {
-      if (selectedChat && data.userId !== (user?.userId || user?._id || user?.id)) {
-        setIsTyping(true);
-        setTimeout(() => setIsTyping(false), 3000);
-      }
-    };
-
-    socket.on('receiveMessage', handleNewMessage);
-    socket.on('userTyping', handleUserTyping);
-
-    return () => {
-      socket.off('receiveMessage', handleNewMessage);
-      socket.off('userTyping', handleUserTyping);
-    };
-  }, [socket, isConnected, selectedChat, user]);
-
-  // Join/leave chat room when selected chat changes
-  useEffect(() => {
-    if (selectedChat && socket && isConnected) {
-      joinRoom(selectedChat._id);
-      return () => {
-        leaveRoom(selectedChat._id);
-      };
-    }
-  }, [selectedChat, socket, isConnected, joinRoom, leaveRoom]);
-
-  // Fetch user's chats
-  const fetchUserChats = async () => {
+    const fetchChats = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/chat/user-chats', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const personal = data.chats.filter(chat => chat.type === 'personal');
-        const group = data.chats.filter(chat => chat.type === 'group');
         
-        setPersonalChats(personal);
-        setGroupChats(group);
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to fetch chats');
-      }
-    } catch (error) {
-      console.error('Error fetching chats:', error);
-      toast.error('Failed to fetch chats');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Get or create trip chat
-  const getOrCreateTripChat = async (tripId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/chat/trip/${tripId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+        if (!token) {
+          setError('No authentication token found');
+          return;
         }
-      });
 
-      if (response.ok) {
-        const data = await response.json();
-        return data.chat;
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to get trip chat');
+        console.log('Fetching chats...');
+        
+        const response = await axios.get('/api/chat/user-chats', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        console.log('Chats response:', response.data);
+        setChats(response.data.chats || []);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching chats:', err);
+        setError('Failed to load chats');
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error getting trip chat:', error);
-      toast.error('Failed to get trip chat');
+    };
+
+    fetchChats();
+  }, [currentUser]);
+
+  // Handle navigation from location state
+  useEffect(() => {
+    if (location.state?.tripId) {
+      console.log('Navigating to trip chat:', location.state.tripId);
+      // Handle trip chat navigation
+    } else if (location.state?.userId) {
+      console.log('Navigating to personal chat:', location.state.userId);
+      // Handle personal chat navigation
     }
-    return null;
+  }, [location.state]);
+
+  // Helper function to get user ID consistently
+  const getCurrentUserId = () => {
+    return currentUser?.id || currentUser?._id || currentUser?.userId;
   };
 
   // Fetch chat messages
   const fetchChatMessages = async (chatId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/chat/${chatId}/messages`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await axios.get(`/api/chat/${chatId}/messages`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.messages;
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to fetch messages');
-      }
+      return response.data.messages || [];
     } catch (error) {
       console.error('Error fetching messages:', error);
-      toast.error('Failed to fetch messages');
-    }
     return [];
-  };
-
-  // Mark message as read
-  const markMessageAsRead = async (messageId) => {
-    try {
-      const token = localStorage.getItem('token');
-      await fetch(`http://localhost:5000/api/chat/${selectedChat._id}/messages/read`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ messageIds: [messageId] })
-      });
-    } catch (error) {
-      console.error('Error marking message as read:', error);
     }
   };
 
   // Send message
-  const sendMessage = async (chatId, text) => {
+  const sendMessage = async (text) => {
+    if (!text.trim() || !selectedChat) return;
+
     try {
       setSendingMessage(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/chat/${chatId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text })
+      
+      const response = await axios.post(`/api/chat/${selectedChat._id}/messages`, {
+        text: text.trim()
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        // Add the new message to the chat
-        setChatMessages(prev => [...prev, data.messageData]);
-        // Send via socket for real-time updates
-        if (socket && isConnected) {
-          socket.emit('sendMessage', {
-            roomId: chatId,
-            text: text,
-            type: 'text'
-          });
-        }
-        return data.messageData;
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to send message');
-      }
+      const newMessage = response.data.message;
+      setMessages(prev => [newMessage, ...prev]);
+      setNewMessage('');
+      
+      // Update chat list with new last message
+      setChats(prev => prev.map(chat => 
+        chat._id === selectedChat._id 
+          ? { ...chat, lastMessage: { text: newMessage.text, timestamp: newMessage.sentAt } }
+          : chat
+      ));
+
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send message');
     } finally {
       setSendingMessage(false);
     }
-    return null;
   };
 
-  // Edit message
-  const editMessage = async (messageId, newText) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/chat/messages/${messageId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text: newText })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        // Update the message in the chat
-        setChatMessages(prev => prev.map(msg => 
-          msg._id === messageId ? { ...msg, text: newText, isEdited: true } : msg
-        ));
-        setEditingMessage(null);
-        setEditText('');
-        
-        // Note: Socket events for message editing not implemented on server
-        
-        toast.success('Message edited successfully');
-        return data.message;
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to edit message');
-      }
-    } catch (error) {
-      console.error('Error editing message:', error);
-      toast.error('Failed to edit message');
-    }
-    return null;
-  };
-
-  // Delete message
-  const deleteMessage = async (messageId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/chat/messages/${messageId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        // Remove the message from the chat
-        setChatMessages(prev => prev.filter(msg => msg._id !== messageId));
-        setShowMessageOptions(null);
-        
-        // Note: Socket events for message deletion not implemented on server
-        
-        toast.success('Message deleted successfully');
-        return true;
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to delete message');
-      }
-    } catch (error) {
-      console.error('Error deleting message:', error);
-      toast.error('Failed to delete message');
-    }
-    return false;
-  };
-
-  // Handle URL parameters for direct chat navigation
-  useEffect(() => {
-    const urlParams = new URLSearchParams(location.search);
-    const targetUserId = urlParams.get('user');
-    const targetTripId = urlParams.get('trip');
-    
-    console.log('URL parameters:', { targetUserId, targetTripId });
-    
-    if (targetTripId) {
-      console.log('Navigating to trip chat:', targetTripId);
-      handleTripChatNavigation(targetTripId);
-    } else if (targetUserId) {
-      console.log('Navigating to personal chat with user:', targetUserId);
-      handlePersonalChatNavigation(targetUserId);
-    } else {
-      // Load user's chats when no specific chat is requested
-      console.log('No specific chat requested, loading user chats');
-      fetchUserChats();
-    }
-  }, [location.search]);
-
-  const handleTripChatNavigation = async (tripId) => {
-    try {
-      setLoading(true);
-      
-      // Get or create trip chat
-      const chat = await getOrCreateTripChat(tripId);
-      if (chat) {
-        // Fetch trip details for the chat
-        const token = localStorage.getItem('token');
-        const tripResponse = await fetch(`http://localhost:5000/api/trips/${tripId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        let tripData = null;
-        if (tripResponse.ok) {
-          tripData = await tripResponse.json();
-        }
-
-        // Create chat object with trip details
-        const chatWithTripDetails = {
-          ...chat,
-          groupName: tripData?.destination || `Trip ${tripId}`,
-          groupAvatar: '🧳',
-          memberCount: tripData?.members?.length || 1,
-          tripDetails: {
-            destination: tripData?.destination || 'Trip Destination',
-            dates: tripData?.startDate && tripData?.endDate ? 
-              `${new Date(tripData.startDate).toLocaleDateString()} - ${new Date(tripData.endDate).toLocaleDateString()}` : 
-              'Trip Dates',
-            organizer: tripData?.creator?.username || 'Trip Organizer',
-            budget: tripData?.budget ? `$${tripData.budget}` : 'Budget TBD',
-            tripType: tripData?.tripType || 'Trip Type TBD',
-            description: tripData?.description || 'No description available'
-          }
-        };
-
-        setSelectedChat(chatWithTripDetails);
-        setActiveTab('group');
-
-        // Fetch messages for this chat
-        const messages = await fetchChatMessages(chat._id);
-        setChatMessages(messages);
-      }
-    } catch (error) {
-      console.error('Error navigating to trip chat:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePersonalChatNavigation = async (userId) => {
-    try {
-      setLoading(true);
-      console.log('Creating personal chat with user:', userId);
-      
-      // Create or get personal chat
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/chat/personal', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ otherUserId: userId })
-      });
-
-      console.log('Chat creation response status:', response.status);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Chat created successfully:', data);
-        setSelectedChat(data.chat);
-        setActiveTab('personal');
-
-        // Fetch messages for this chat
-        const messages = await fetchChatMessages(data.chat._id);
-        setChatMessages(messages);
-      } else {
-        const errorData = await response.json();
-        console.error('Failed to create chat:', errorData);
-        toast.error(errorData.message || 'Failed to create chat');
-      }
-    } catch (error) {
-      console.error('Error navigating to personal chat:', error);
-      toast.error('Failed to create chat. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Auto-scroll to bottom when chat messages change
-  useEffect(() => {
-    if (chatMessages.length > 0) {
-      const chatMessagesElement = document.querySelector('.chat-messages');
-      if (chatMessagesElement) {
-        chatMessagesElement.scrollTop = chatMessagesElement.scrollHeight;
-      }
-    }
-  }, [chatMessages]);
-
-  const handleChatSelect = async (chat) => {
-    setSelectedChat(chat);
-    setActiveTab(chat.type);
-    
-    // Fetch messages for this chat
-    const messages = await fetchChatMessages(chat._id);
-    setChatMessages(messages);
-  };
-
+  // Handle send message
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedChat || sendingMessage) return;
-
-    const message = await sendMessage(selectedChat._id, newMessage);
-    if (message) {
-      setNewMessage('');
-      // Stop typing indicator
-      if (socket && isConnected && selectedChat) {
-        socket.emit('typing', { roomId: selectedChat._id, isTyping: false });
-      }
-    }
+    await sendMessage(newMessage);
   };
 
-  // Handle typing indicator
-  const handleInputChange = (e) => {
-    setNewMessage(e.target.value);
+  // Handle chat selection
+  const handleChatSelect = async (chat) => {
+    setSelectedChat(chat);
+    setMessages([]);
     
-    // Start/stop typing indicator
-    if (socket && isConnected && selectedChat) {
-      if (e.target.value.trim()) {
-        socket.emit('typing', { roomId: selectedChat._id, isTyping: true });
-      } else {
-        socket.emit('typing', { roomId: selectedChat._id, isTyping: false });
-      }
-    }
+    // Fetch messages for the selected chat
+    const chatMessages = await fetchChatMessages(chat._id);
+    setMessages(chatMessages);
   };
 
-  const handleBackToMessages = () => {
-    setSelectedChat(null);
-    setChatMessages([]);
-    setNewMessage('');
-    // Refresh the chat list
-    fetchUserChats();
-  };
-
-  // Navigate to user profile
-  const handleProfileClick = (userId) => {
-    if (userId) {
-      navigate(`/profile/${userId}`);
+  // Filter chats based on search and active tab
+  const filteredChats = chats.filter(chat => {
+    // Filter by tab
+    if (activeTab === 'personal' && chat.type !== 'personal') return false;
+    if (activeTab === 'group' && chat.type !== 'group') return false;
+    
+    // Filter by search
+    if (!searchQuery) return true;
+    const searchLower = searchQuery.toLowerCase();
+    
+    if (chat.type === 'personal') {
+      const otherParticipant = chat.participants?.find(p => p._id !== getCurrentUserId());
+      return otherParticipant?.username?.toLowerCase().includes(searchLower) ||
+             otherParticipant?.name?.toLowerCase().includes(searchLower);
     } else {
-      toast.error('Unable to navigate to profile');
+      return chat.name?.toLowerCase().includes(searchLower);
     }
-  };
+  });
 
-  const formatTimeAgo = (timestamp) => {
-    const now = new Date();
-    const diff = now - new Date(timestamp);
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
+  // Separate chats by type
+  const personalChats = filteredChats.filter(chat => chat.type === 'personal');
+  const groupChats = filteredChats.filter(chat => chat.type === 'group');
 
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
-  };
-
-  const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // Chat and User Action Functions
-  const handleDeleteChat = async (chatId) => {
-    if (!window.confirm('Are you sure you want to delete this chat? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/chat/${chatId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        toast.success('Chat deleted successfully');
-        setSelectedChat(null);
-        setChatMessages([]);
-        fetchUserChats(); // Refresh chat list
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to delete chat');
-      }
-    } catch (error) {
-      console.error('Error deleting chat:', error);
-      toast.error('Failed to delete chat');
-    }
-  };
-
-  const handleReportUser = async (userId, reason) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/flags', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          targetType: 'user',
-          targetId: userId,
-          reason: reason,
-          description: `User reported from chat: ${reason}`
-        })
-      });
-
-      if (response.ok) {
-        toast.success('User reported successfully');
-        setShowUserActions(false);
-        setSelectedUser(null);
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to report user');
-      }
-    } catch (error) {
-      console.error('Error reporting user:', error);
-      toast.error('Failed to report user');
-    }
-  };
-
-  const handleBlockUser = async (userId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/users/block', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          blockedUserId: userId
-        })
-      });
-
-      if (response.ok) {
-        toast.success('User blocked successfully');
-        setShowUserActions(false);
-        setSelectedUser(null);
-        // Refresh chat list to remove blocked user's chats
-        fetchUserChats();
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to block user');
-      }
-    } catch (error) {
-      console.error('Error blocking user:', error);
-      toast.error('Failed to block user');
-    }
-  };
-
-  const openUserActions = (user) => {
-    setSelectedUser(user);
-    setShowUserActions(true);
-  };
-
-  const openChatActions = () => {
-    setShowChatActions(true);
-  };
-
-  // Group messages by sender for consecutive messages
-  const groupMessagesBySender = (messages) => {
-    const grouped = [];
-    let currentGroup = null;
-
-    console.log('Grouping messages - Current user:', user);
-    console.log('Messages to group:', messages);
-
-    messages.forEach((message, index) => {
-      const isFirstMessage = index === 0;
-      const isSameSender = currentGroup && currentGroup.sender._id === message.sender._id;
-      const timeDiff = currentGroup ? new Date(message.sentAt) - new Date(currentGroup.messages[currentGroup.messages.length - 1].sentAt) : 0;
-      const shouldGroup = isSameSender && timeDiff < 300000; // 5 minutes
-
-      // Compare sender ID with current user ID
-      const senderId = message.sender._id;
-      const currentUserId = user?.userId || user?._id || user?.id; // Handle all possible user ID fields
-      const isOwn = senderId === currentUserId;
-
-      if (shouldGroup) {
-        currentGroup.messages.push(message);
-      } else {
-        if (currentGroup) {
-          grouped.push(currentGroup);
-        }
-        currentGroup = {
-          sender: message.sender,
-          messages: [message],
-          isOwn: isOwn
-        };
-      }
-    });
-
-    if (currentGroup) {
-      grouped.push(currentGroup);
-    }
-
-    return grouped;
-  };
-
+  // Loading state
   if (loading) {
     return (
-      <div className="dashboard-container">
+      <div className="messages-container">
         <div className="loading-state">
           <div className="loading-spinner"></div>
-          <p>Loading chat...</p>
+          <p>Loading messages...</p>
         </div>
       </div>
     );
   }
 
-  if (selectedChat) {
-    const groupedMessages = groupMessagesBySender(chatMessages);
-    const isGroupChat = selectedChat.type === 'group';
-    const tripDetails = isGroupChat ? selectedChat.tripDetails : null;
-
+  // Error state
+  if (error) {
     return (
-      <div className="modern-chat-container">
-        {/* Chat Header */}
-        <div className="chat-header">
-          <div className="chat-header-left">
-            <button className="back-btn" onClick={handleBackToMessages}>
-              ← Back
+      <div className="messages-container">
+        <div className="loading-state">
+          <div className="empty-icon">⚠️</div>
+          <h3>Something went wrong</h3>
+          <p>{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{ 
+              marginTop: '16px', 
+              padding: '8px 16px', 
+              background: '#3b82f6', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '8px', 
+              cursor: 'pointer' 
+            }}
+          >
+            Refresh Page
             </button>
-            <div className="chat-info">
-              <div className="chat-title">
-                {isGroupChat ? selectedChat.groupName : selectedChat.name}
-              </div>
-              {isGroupChat && (
-                <div className="chat-subtitle">
-                  {selectedChat.memberCount} members
-                </div>
-              )}
             </div>
           </div>
-          <div className="chat-header-right">
-            <button 
-              className="chat-actions-btn"
-              onClick={openChatActions}
-              title="Chat actions"
-            >
-              ⋮
-            </button>
+    );
+  }
+
+  // Main render
+  return (
+    <div className="messages-container">
+      {/* Chat List Sidebar */}
+      <div className="chat-sidebar">
+        <div className="sidebar-header">
+          <h2>Messages</h2>
+          <div className="connection-status">
+            <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`}></span>
+            {isConnected ? 'Connected' : 'Disconnected'}
           </div>
         </div>
 
-        {/* Main Chat Area */}
-        <div className="chat-main">
-          {/* Messages Column */}
-          <div className="messages-column">
-            <div className="chat-messages">
-              {groupedMessages.length === 0 ? (
-                <div className="empty-chat">
-                  <div className="empty-chat-icon">💬</div>
-                  <h3>No messages yet</h3>
-                  <p>Start the conversation by sending a message!</p>
+        <div className="search-container">
+          <input
+            type="text"
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+        </div>
+
+        {/* Chat Type Tabs */}
+        <div className="chat-tabs">
+          <button 
+            className={`tab-btn ${activeTab === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveTab('all')}
+          >
+            All ({filteredChats.length})
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'personal' ? 'active' : ''}`}
+            onClick={() => setActiveTab('personal')}
+          >
+            Personal ({personalChats.length})
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'group' ? 'active' : ''}`}
+            onClick={() => setActiveTab('group')}
+          >
+            Groups ({groupChats.length})
+          </button>
+        </div>
+
+        <div className="chat-list">
+          {filteredChats.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">💬</div>
+              <h3>No conversations found</h3>
+              <p>{searchQuery ? 'Try adjusting your search' : 'Start chatting with other travelers!'}</p>
                 </div>
               ) : (
-                groupedMessages.map((group, groupIndex) => (
-                <div key={groupIndex} className={`message-group ${group.isOwn ? 'own' : 'other'}`}>
-                  {group.messages.map((message, messageIndex) => (
-                    <div key={message._id} className="message-wrapper">
-                                             {/* Show avatar and name for first message in group */}
-                       {messageIndex === 0 && (
-                         <div className="message-sender-info">
-                           <div 
-                             className="sender-avatar clickable"
-                             onClick={() => handleProfileClick(message.sender._id)}
-                             title={`View ${message.sender.username}'s profile`}
-                           >
+            <>
+              {/* Personal Chats Section */}
+              {activeTab === 'all' && personalChats.length > 0 && (
+                <div className="chat-section">
+                  <h4 className="section-title">Personal Chats</h4>
+                  {personalChats.map(chat => (
+                    <div
+                      key={chat._id}
+                      className={`chat-item ${selectedChat?._id === chat._id ? 'active' : ''}`}
+                      onClick={() => handleChatSelect(chat)}
+                    >
+                      <div className="chat-avatar">
                              {(() => {
-                               // Show profile image if it exists and is not empty
-                               const shouldShowImage = message.sender.profileImage && 
-                                                      message.sender.profileImage.trim() !== '' && 
-                                                      message.sender.profileImage !== 'default-avatar.png';
-                               
-                               return shouldShowImage ? (
-                                 <img 
-                                   src={message.sender.profileImage} 
-                                   alt={message.sender.username || message.sender.name || 'Unknown'}
-                                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                   onError={(e) => {
-                                     e.target.style.display = 'none';
-                                     e.target.nextSibling.style.display = 'flex';
-                                   }}
-                                 />
-                               ) : null;
+                          const otherParticipant = chat.participants?.find(p => p._id !== getCurrentUserId());
+                          const profileImage = getProfileImageUrl(otherParticipant);
+                          return profileImage ? (
+                            <img src={profileImage} alt={getDisplayName(otherParticipant)} />
+                          ) : (
+                            <div className="avatar-fallback">
+                              {getDisplayName(otherParticipant).charAt(0).toUpperCase()}
+                            </div>
+                          );
                              })()}
-                             <div className="avatar-fallback" style={{ 
-                               display: (message.sender.profileImage && 
-                                         message.sender.profileImage.trim() !== '' && 
-                                         message.sender.profileImage !== 'default-avatar.png') ? 'none' : 'flex' 
-                             }}>
-                               {(message.sender.username || message.sender.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="chat-info">
+                        <div className="chat-header">
+                          <h4 className="chat-name">
+                            {getDisplayName(chat.participants?.find(p => p._id !== getCurrentUserId()))}
+                          </h4>
+                          <span className="chat-time">
+                            {chat.lastMessage?.timestamp ? new Date(chat.lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </span>
+                        </div>
+                        <div className="chat-preview">
+                          <p>{chat.lastMessage?.text || 'No messages yet'}</p>
+                        </div>
                              </div>
                            </div>
-                           <div className="sender-details">
-                             <div 
-                               className="sender-name clickable"
-                               onClick={() => handleProfileClick(message.sender._id)}
-                               title={`View ${message.sender.username}'s profile`}
-                             >
-                               {message.sender.username || message.sender.name || 'Unknown'}
-                               {isGroupChat && message.sender._id === selectedChat.tripDetails?.organizer && (
-                                 <span className="role-badge creator">👑 Creator</span>
-                               )}
-                               {!group.isOwn && (
-                                 <button 
-                                   className="user-action-btn"
-                                   onClick={() => openUserActions(message.sender)}
-                                   title="User actions"
-                                 >
-                                   ⋮
-                                 </button>
-                               )}
+                  ))}
+                </div>
+              )}
+
+              {/* Group Chats Section */}
+              {activeTab === 'all' && groupChats.length > 0 && (
+                <div className="chat-section">
+                  <h4 className="section-title">Group Chats</h4>
+                  {groupChats.map(chat => (
+                    <div
+                      key={chat._id}
+                      className={`chat-item ${selectedChat?._id === chat._id ? 'active' : ''}`}
+                      onClick={() => handleChatSelect(chat)}
+                    >
+                      <div className="chat-avatar">
+                        {chat.tripImage ? (
+                          <img src={`http://localhost:5000/uploads/${chat.tripImage}`} alt={chat.name} />
+                        ) : (
+                          <div className="group-avatar">🧳</div>
+                        )}
+                      </div>
+                      <div className="chat-info">
+                        <div className="chat-header">
+                          <h4 className="chat-name">{chat.name}</h4>
+                          <span className="chat-time">
+                            {chat.lastMessage?.timestamp ? new Date(chat.lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </span>
+                        </div>
+                        <div className="chat-preview">
+                          <p>{chat.lastMessage?.text || 'No messages yet'}</p>
                              </div>
                            </div>
+                    </div>
+                  ))}
                          </div>
                        )}
                       
-                        <div className={`message-bubble ${group.isOwn ? 'own' : 'other'}`}>
-                          {editingMessage === message._id ? (
-                            <div className="message-edit-form">
-                              <input
-                                type="text"
-                                value={editText}
-                                onChange={(e) => setEditText(e.target.value)}
-                                className="edit-input"
-                                autoFocus
-                              />
-                              <div className="edit-actions">
-                                <button 
-                                  onClick={() => editMessage(message._id, editText)}
-                                  className="edit-save-btn"
-                                >
-                                  Save
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setEditingMessage(null);
-                                    setEditText('');
-                                  }}
-                                  className="edit-cancel-btn"
-                                >
-                                  Cancel
-                                </button>
+              {/* Single Tab View */}
+              {(activeTab === 'personal' || activeTab === 'group') && (
+                <div className="chat-section">
+                  {(activeTab === 'personal' ? personalChats : groupChats).map(chat => (
+                    <div
+                      key={chat._id}
+                      className={`chat-item ${selectedChat?._id === chat._id ? 'active' : ''}`}
+                      onClick={() => handleChatSelect(chat)}
+                    >
+                      <div className="chat-avatar">
+                        {chat.type === 'personal' ? (
+                          (() => {
+                            const otherParticipant = chat.participants?.find(p => p._id !== getCurrentUserId());
+                            const profileImage = getProfileImageUrl(otherParticipant);
+                            return profileImage ? (
+                              <img src={profileImage} alt={getDisplayName(otherParticipant)} />
+                            ) : (
+                              <div className="avatar-fallback">
+                                {getDisplayName(otherParticipant).charAt(0).toUpperCase()}
                               </div>
-                            </div>
+                            );
+                          })()
+                        ) : (
+                          chat.tripImage ? (
+                            <img src={`http://localhost:5000/uploads/${chat.tripImage}`} alt={chat.name} />
                           ) : (
-                            <>
-                              <div className="message-content">
-                                {message.text}
-                                {message.isEdited && <span className="edited-indicator"> (edited)</span>}
-                              </div>
-                              <div className="message-footer">
-                                <div className="message-time">{formatTime(message.sentAt)}</div>
-                                {group.isOwn && (
-                                  <div className="message-options">
-                                    <button 
-                                      className="message-option-btn"
-                                      onClick={() => setShowMessageOptions(showMessageOptions === message._id ? null : message._id)}
-                                    >
-                                      ⋮
-                                    </button>
-                                    {showMessageOptions === message._id && (
-                                      <div className="message-options-menu">
-                                        <button 
-                                          onClick={() => {
-                                            setEditingMessage(message._id);
-                                            setEditText(message.text);
-                                            setShowMessageOptions(null);
-                                          }}
-                                          className="option-btn edit-btn"
-                                        >
-                                          ✏️ Edit
-                                        </button>
-                                        <button 
-                                          onClick={() => deleteMessage(message._id)}
-                                          className="option-btn delete-btn"
-                                        >
-                                          🗑️ Delete
-                                        </button>
-                                      </div>
+                            <div className="group-avatar">🧳</div>
+                          )
                                     )}
                                   </div>
-                                )}
+                      <div className="chat-info">
+                        <div className="chat-header">
+                          <h4 className="chat-name">
+                            {chat.type === 'personal' 
+                              ? getDisplayName(chat.participants?.find(p => p._id !== getCurrentUserId()))
+                              : chat.name
+                            }
+                          </h4>
+                          <span className="chat-time">
+                            {chat.lastMessage?.timestamp ? new Date(chat.lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </span>
                               </div>
-                            </>
-                          )}
+                        <div className="chat-preview">
+                          <p>{chat.lastMessage?.text || 'No messages yet'}</p>
+                        </div>
                         </div>
                     </div>
                   ))}
                 </div>
-                ))
               )}
-              
-              {/* Typing Indicator */}
-              {isTyping && (
-                <div className="typing-indicator">
-                  <div className="typing-avatar">👤</div>
-                  <div className="typing-bubble">
-                    <div className="typing-dots">
-                      <span></span>
-                      <span></span>
-                      <span></span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="chat-main">
+        {selectedChat ? (
+          <div className="chat-area">
+            {/* Chat Header */}
+            <div className="chat-header">
+              <div className="chat-header-info">
+                <div className="chat-avatar">
+                  {selectedChat.type === 'personal' ? (
+                    (() => {
+                      const otherParticipant = selectedChat.participants?.find(p => p._id !== getCurrentUserId());
+                      const profileImage = getProfileImageUrl(otherParticipant);
+                      return profileImage ? (
+                        <img src={profileImage} alt={getDisplayName(otherParticipant)} />
+                      ) : (
+                        <div className="avatar-fallback">
+                          {getDisplayName(otherParticipant).charAt(0).toUpperCase()}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    selectedChat.tripImage ? (
+                      <img src={`http://localhost:5000/uploads/${selectedChat.tripImage}`} alt={selectedChat.name} />
+                    ) : (
+                      <div className="group-avatar">🧳</div>
+                    )
+                  )}
+                </div>
+                <div className="chat-details">
+                  <h3 className="chat-title">
+                    {selectedChat.type === 'personal' 
+                      ? getDisplayName(selectedChat.participants?.find(p => p._id !== getCurrentUserId()))
+                      : selectedChat.name
+                    }
+                  </h3>
+                  <p className="chat-status">
+                    {selectedChat.type === 'personal' ? 'Personal Chat' : `${selectedChat.participants?.length || 0} members`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Messages Area */}
+            <div className="messages-area">
+              {messages.length === 0 ? (
+                <div className="empty-messages">
+                  <div className="empty-icon">💬</div>
+                  <h3>No messages yet</h3>
+                  <p>Start the conversation!</p>
+                </div>
+              ) : (
+                <div className="messages-list">
+                  {messages.map((message) => {
+                    const isOwn = message.sender._id === getCurrentUserId();
+                    return (
+                      <div key={message._id} className={`message-wrapper ${isOwn ? 'own' : 'other'}`}>
+                        {!isOwn && (
+                          <div className="message-avatar">
+                            {(() => {
+                              const profileImage = getProfileImageUrl(message.sender);
+                              return profileImage ? (
+                                <img src={profileImage} alt={getDisplayName(message.sender)} />
+                              ) : (
+                                <div className="avatar-fallback">
+                                  {getDisplayName(message.sender).charAt(0).toUpperCase()}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+                        
+                        <div className="message-content">
+                          {!isOwn && (
+                            <div className="message-sender">
+                              {getDisplayName(message.sender)}
+                            </div>
+                          )}
+                          
+                          <div className="message-bubble">
+                            <div className="message-text">
+                              {message.text}
+                            </div>
+                          </div>
+                          
+                          <div className="message-footer">
+                            <span className="message-time">
+                              {new Date(message.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
                     </div>
                   </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
             {/* Message Input */}
-            <div className="message-input-area">
-              <form onSubmit={handleSendMessage} className="message-input-form">
-                <button type="button" className="input-btn emoji-btn" title="Add Emoji">
-                  😊
-                </button>
-                <button type="button" className="input-btn attachment-btn" title="Attach File">
-                  📎
-                </button>
+            <div className="message-input">
+              <form onSubmit={handleSendMessage} className="input-form">
                 <input
                   type="text"
                   value={newMessage}
-                  onChange={handleInputChange}
-                  placeholder="Type your message..."
-                  className="chat-input"
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  className="message-input-field"
                   disabled={sendingMessage}
                 />
                 <button 
                   type="submit" 
                   className="input-btn send-btn" 
-                  title="Send Message"
                   disabled={sendingMessage || !newMessage.trim()}
+                  title="Send message"
                 >
                   {sendingMessage ? '⏳' : '✈️'}
                 </button>
               </form>
             </div>
           </div>
-
-          {/* Trip Details Sidebar */}
-          {isGroupChat && (
-            <div className="trip-sidebar">
-              <div className="sidebar-header">
-                <h3>Trip Details</h3>
-                <button 
-                  className="pin-btn"
-                  onClick={() => setShowPinnedInfo(!showPinnedInfo)}
-                >
-                  📌
-                </button>
-              </div>
-              
-              <div className="trip-info">
-                <div className="info-item">
-                  <span className="info-label">📍 Destination</span>
-                  <span className="info-value">{tripDetails?.destination}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">📅 Dates</span>
-                  <span className="info-value">{tripDetails?.dates}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">👤 Organizer</span>
-                  <span className="info-value">{tripDetails?.organizer}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">💰 Budget</span>
-                  <span className="info-value">{tripDetails?.budget}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">🚗 Trip Type</span>
-                  <span className="info-value">{tripDetails?.tripType}</span>
-                </div>
-                {tripDetails?.description && tripDetails.description !== 'No description available' && (
-                <div className="info-item">
-                    <span className="info-label">📝 Description</span>
-                    <span className="info-value">{tripDetails?.description}</span>
-                </div>
-                )}
-              </div>
-
-              {showPinnedInfo && (
-                <div className="pinned-messages">
-                  <h4>📌 Pinned Messages</h4>
-                  <div className="pinned-item">
-                    <div className="pinned-content">
-                      No pinned messages yet
-                    </div>
-                  </div>
-                </div>
-              )}
+        ) : (
+          <div className="no-chat-selected">
+            <div className="no-chat-icon">💬</div>
+            <h3>Select a conversation</h3>
+            <p>Choose a chat from the sidebar to start messaging</p>
             </div>
           )}
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="dashboard-container">
-      <section className="dashboard-section">
-        <div className="section-header">
-          <h2>💬 Messages</h2>
-          <p>Stay connected with fellow travelers</p>
-        </div>
-
-        {/* Messages Tabs */}
-        <div className="messages-tabs">
-          <button
-            className={`tab-btn ${activeTab === 'personal' ? 'active' : ''}`}
-            onClick={() => setActiveTab('personal')}
-          >
-            Personal
-            <span className="tab-badge">
-              {personalChats.filter(m => m.unread > 0).length}
-            </span>
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'group' ? 'active' : ''}`}
-            onClick={() => setActiveTab('group')}
-          >
-            Group Chats
-            <span className="tab-badge">
-              {groupChats.filter(m => m.unread > 0).length}
-            </span>
-          </button>
-        </div>
-
-        {/* Messages List */}
-        <div className="messages-content">
-          {loading ? (
-            <div className="loading-state">
-              <div className="loading-spinner"></div>
-              <p>Loading chats...</p>
-            </div>
-          ) : (
-          <div className="messages-list">
-              {(activeTab === 'personal' ? personalChats : groupChats).length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-icon">💬</div>
-                  <h3>No {activeTab === 'personal' ? 'personal' : 'group'} chats yet</h3>
-                  <p>
-                    {activeTab === 'personal' 
-                      ? 'Start a conversation with other travelers!' 
-                      : 'Join a trip to see group chats here!'}
-                  </p>
-                </div>
-              ) : (
-                (activeTab === 'personal' ? personalChats : groupChats).map(chat => (
-                  <div
-                    key={chat._id}
-                    className={`message-item ${chat.unread > 0 ? 'unread' : ''}`}
-                    onClick={() => handleChatSelect(chat)}
-              >
-                <div className="message-avatar">
-                      {activeTab === 'personal' 
-                        ? (() => {
-                            const participant = chat.participants?.find(p => p._id !== (user?.userId || user?._id || user?.id));
-                            if (participant?.profileImage && participant.profileImage.trim() !== '' && participant.profileImage !== 'default-avatar.png') {
-                              return <img src={participant.profileImage} alt={participant.username || participant.name || 'User'} />;
-                            } else {
-                              return <span>{(participant?.username || participant?.name || 'U').charAt(0).toUpperCase()}</span>;
-                            }
-                          })()
-                        : '🧳'
-                      }
-                </div>
-                <div className="chat-list-content">
-                  <div className="chat-title">
-                        {activeTab === 'personal' 
-                          ? chat.name || `Chat with ${chat.participants?.find(p => p._id !== (user?.userId || user?._id || user?.id))?.name || 'User'}`
-                          : chat.name || 'Trip Chat'
-                        }
-                  </div>
-                  <div className="chat-members">
-                    {activeTab === 'personal'
-                      ? null
-                          : <span className="member-count">Trip members</span>
-                    }
-                  </div>
-                      <div className="chat-preview">
-                        {chat.lastMessage?.text || 'No messages yet'}
-                      </div>
-                </div>
-                    <span className="chat-list-timestamp">
-                      {chat.lastMessage?.timestamp ? formatTimeAgo(chat.lastMessage.timestamp) : 'New'}
-                    </span>
-                    {chat.unread > 0 && (
-                  <div className="unread-indicator">
-                        <span className="unread-count">{chat.unread}</span>
-                      </div>
-                    )}
-                  </div>
-                ))
-                )}
-              </div>
-          )}
-        </div>
-      </section>
-
-      {/* Chat Actions Modal */}
-      {showChatActions && (
-        <div className="modal-overlay" onClick={() => setShowChatActions(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Chat Actions</h3>
-              <button className="modal-close" onClick={() => setShowChatActions(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <button 
-                className="action-btn delete-btn"
-                onClick={() => {
-                  handleDeleteChat(selectedChat._id);
-                  setShowChatActions(false);
-                }}
-              >
-                🗑️ Delete Chat
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* User Actions Modal */}
-      {showUserActions && selectedUser && (
-        <div className="modal-overlay" onClick={() => setShowUserActions(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>User Actions - {selectedUser.username || selectedUser.name}</h3>
-              <button className="modal-close" onClick={() => setShowUserActions(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="action-section">
-                <h4>Report User</h4>
-                <div className="report-reasons">
-                  <button 
-                    className="action-btn report-btn"
-                    onClick={() => handleReportUser(selectedUser._id, 'Inappropriate content')}
-                  >
-                    🚫 Inappropriate content
-                  </button>
-                  <button 
-                    className="action-btn report-btn"
-                    onClick={() => handleReportUser(selectedUser._id, 'Harassment')}
-                  >
-                    🚫 Harassment
-                  </button>
-                  <button 
-                    className="action-btn report-btn"
-                    onClick={() => handleReportUser(selectedUser._id, 'Spam')}
-                  >
-                    🚫 Spam
-                  </button>
-                  <button 
-                    className="action-btn report-btn"
-                    onClick={() => handleReportUser(selectedUser._id, 'Other')}
-                  >
-                    🚫 Other
-                  </button>
-                </div>
-              </div>
-              <div className="action-section">
-                <h4>Block User</h4>
-                <button 
-                  className="action-btn block-btn"
-                  onClick={() => {
-                    handleBlockUser(selectedUser._id);
-                    setShowUserActions(false);
-                  }}
-                >
-                  🚫 Block User
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 } 

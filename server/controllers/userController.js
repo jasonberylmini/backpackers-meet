@@ -554,3 +554,38 @@ export const getDashboardTrips = async (req, res) => {
   }
 };
 
+// Get user's friends
+export const getUserFriends = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user.userId;
+    
+    // Check if user is requesting their own friends or if they're friends with the target user
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Only allow viewing friends if it's the current user's profile or if they're friends
+    if (userId !== currentUserId) {
+      const currentUser = await User.findById(currentUserId);
+      if (!currentUser.friends.includes(userId)) {
+        return res.status(403).json({ message: 'You can only view friends of users you are friends with' });
+      }
+    }
+    
+    // Get friends with populated data
+    const friends = await User.find({ _id: { $in: targetUser.friends } })
+      .select('name username profileImage country instagram bio createdAt')
+      .sort({ name: 1 });
+    
+    res.status(200).json({
+      friends,
+      count: friends.length
+    });
+  } catch (error) {
+    logger.error('Get User Friends Error:', error);
+    res.status(500).json({ message: 'Failed to fetch user friends' });
+  }
+};
+
