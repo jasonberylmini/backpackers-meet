@@ -4,13 +4,19 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useSocket } from '../contexts/SocketContext';
 import { getProfileImageUrl, getDisplayFirstChar } from '../utils/userDisplay';
+import { isTripCompleted } from '../utils/tripStatus';
 import ReviewsList from '../components/ReviewsList';
+import ReviewForm from '../components/ReviewForm';
 import './TripDetails.css';
 
 export default function TripDetails() {
   const { tripId } = useParams();
   const navigate = useNavigate();
   const { isConnected } = useSocket();
+  
+  const handleMemberProfileClick = (memberId) => {
+    navigate(`/profile/${memberId}`);
+  };
   
   const [trip, setTrip] = useState(null);
   const [user, setUser] = useState(null);
@@ -29,6 +35,11 @@ export default function TripDetails() {
 
   const [isMember, setIsMember] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
+  
+  // Review form state
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [editingReview, setEditingReview] = useState(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -144,6 +155,29 @@ export default function TripDetails() {
     toast.info('Trip settings coming soon!');
   };
 
+  const handleMarkAsCompleted = async () => {
+    if (!window.confirm('Are you sure you want to mark this trip as completed? This will allow members to write reviews.')) {
+      return;
+    }
+    
+    try {
+      setActionLoading(true);
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.post(`/api/trips/${tripId}/complete`, {}, { headers });
+      toast.success('Trip marked as completed successfully! Members can now write reviews.');
+      fetchTripDetails(); // Refresh trip data
+    } catch (error) {
+      console.error('Failed to mark trip as completed:', error);
+      toast.error(error.response?.data?.message || 'Failed to mark trip as completed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+
+
   const searchUsers = async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -225,6 +259,13 @@ export default function TripDetails() {
 
   const getTripStatus = () => {
     if (!trip) return 'unknown';
+    
+    // First check if the trip has been manually marked as completed
+    if (trip.status === 'completed') {
+      return 'completed';
+    }
+    
+    // If not manually completed, calculate based on dates
     const now = new Date();
     const startDate = new Date(trip.startDate);
     const endDate = new Date(trip.endDate);
@@ -348,6 +389,15 @@ export default function TripDetails() {
                     >
                       ✏️ Edit
                     </button>
+                    {trip.status !== 'completed' && (
+                      <button 
+                        className="action-btn-modern success"
+                        onClick={handleMarkAsCompleted}
+                        disabled={actionLoading}
+                      >
+                        {actionLoading ? 'Marking...' : '✅ Mark as Completed'}
+                      </button>
+                    )}
                     <button 
                       className="action-btn-modern danger"
                         onClick={handleDeleteTrip}
@@ -630,9 +680,18 @@ export default function TripDetails() {
                     reviewType="trip"
                     tripId={tripId}
                     trip={trip}
-                    showReviewForm={trip?.status === 'completed'}
+                    showReviewForm={false}
                     onReviewSubmitted={(review) => {
                       toast.success('Trip review submitted successfully!');
+                    }}
+                    onReviewButtonClick={(userId) => {
+                      setShowReviewForm(true);
+                      setSelectedMember(null); // No specific member for trip reviews
+                    }}
+                    onEditReview={(review) => {
+                      setShowReviewForm(true);
+                      setSelectedMember(null);
+                      setEditingReview(review);
                     }}
                   />
                 ) : (
@@ -643,7 +702,7 @@ export default function TripDetails() {
               </div>
 
               {/* Member Reviews - Only show if trip is completed */}
-              {!loading && trip && trip.status === 'completed' && (
+              {!loading && trip && isTripCompleted(trip) && (
                 <div className="member-reviews-section">
                   <h3 className="reviews-section-title">Member Reviews</h3>
                   <p className="member-reviews-description">
@@ -654,7 +713,10 @@ export default function TripDetails() {
                     {/* Creator Reviews - Only show if not the current user */}
                     {trip.creator && user && trip.creator._id !== (user.id || user._id || user.userId) && (
                       <div className="member-review-card">
-                        <div className="member-info">
+                        <div className="member-info" 
+                             style={{ cursor: 'pointer' }}
+                             onClick={() => handleMemberProfileClick(trip.creator._id)}
+                             title="Click to view profile">
                           <div className="member-avatar">
                             {trip.creator.profileImage ? (
                               <img 
@@ -676,24 +738,40 @@ export default function TripDetails() {
                             <p className="member-username">@{trip.creator.username}</p>
                           </div>
                         </div>
-                        <ReviewsList
-                          reviewType="user"
-                          userId={trip.creator._id}
-                          tripId={tripId}
-                          showReviewForm={false}
-                          onReviewSubmitted={(review) => {
-                            toast.success(`Review submitted for ${trip.creator.firstName}!`);
-                          }}
-                        />
+                                                  <ReviewsList
+                            reviewType="user"
+                            userId={trip.creator._id}
+                            tripId={tripId}
+                            trip={trip}
+                            showReviewForm={false}
+                            showMemberReviewButton={true}
+                            onReviewSubmitted={(review) => {
+                              toast.success(`Review submitted for ${trip.creator.firstName}!`);
+                            }}
+                            onReviewButtonClick={(userId) => {
+                              setShowReviewForm(true);
+                              setSelectedMember(trip.creator);
+                            }}
+                            onEditReview={(review) => {
+                              setShowReviewForm(true);
+                              setSelectedMember(trip.creator);
+                              setEditingReview(review);
+                            }}
+                          />
+                          
+                          
                       </div>
                     )}
 
-                    {/* Member Reviews - Only show if not the current user */}
+                    {/* Member Reviews - Only show if not the current user and not the creator */}
                     {trip.members && trip.members
-                      .filter(member => user && member._id !== (user.id || user._id || user.userId))
+                      .filter(member => user && member._id !== (user.id || user._id || user.userId) && member._id !== trip.creator._id)
                       .map(member => (
                         <div key={member._id} className="member-review-card">
-                          <div className="member-info">
+                          <div className="member-info" 
+                               style={{ cursor: 'pointer' }}
+                               onClick={() => handleMemberProfileClick(member._id)}
+                               title="Click to view profile">
                             <div className="member-avatar">
                               {member.profileImage ? (
                                 <img 
@@ -719,11 +797,24 @@ export default function TripDetails() {
                             reviewType="user"
                             userId={member._id}
                             tripId={tripId}
+                            trip={trip}
                             showReviewForm={false}
+                            showMemberReviewButton={true}
                             onReviewSubmitted={(review) => {
                               toast.success(`Review submitted for ${member.firstName}!`);
                             }}
+                            onReviewButtonClick={(userId) => {
+                              setShowReviewForm(true);
+                              setSelectedMember(member);
+                            }}
+                            onEditReview={(review) => {
+                              setShowReviewForm(true);
+                              setSelectedMember(member);
+                              setEditingReview(review);
+                            }}
                           />
+                          
+
                         </div>
                       ))}
 
@@ -886,6 +977,46 @@ export default function TripDetails() {
           </div>
         </div>
       )}
+
+      {/* Review Form Modal */}
+      {showReviewForm && (
+        <ReviewForm
+          reviewType={selectedMember ? "user" : "trip"}
+          tripId={tripId}
+          reviewedUser={selectedMember?._id}
+          editingReview={editingReview}
+          onReviewSubmitted={(review) => {
+            if (selectedMember) {
+              toast.success(`Review submitted for ${selectedMember.firstName}!`);
+            } else {
+              toast.success('Trip review submitted successfully!');
+            }
+            setShowReviewForm(false);
+            setSelectedMember(null);
+            setEditingReview(null);
+            // Refresh trip details to show new review
+            fetchTripDetails();
+          }}
+          onReviewUpdated={(review) => {
+            if (selectedMember) {
+              toast.success(`Review updated for ${selectedMember.firstName}!`);
+            } else {
+              toast.success('Trip review updated successfully!');
+            }
+            setShowReviewForm(false);
+            setSelectedMember(null);
+            setEditingReview(null);
+            // Refresh trip details to show updated review
+            fetchTripDetails();
+          }}
+          onCancel={() => {
+            setShowReviewForm(false);
+            setSelectedMember(null);
+            setEditingReview(null);
+          }}
+        />
+      )}
+
     </div>
   );
 } 

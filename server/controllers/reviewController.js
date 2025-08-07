@@ -13,11 +13,43 @@ async function isTripParticipant(tripId, userId) {
   );
 }
 
-// Helper: Check if trip is completed
+// Helper: Check if trip is completed (with date-based logic)
 async function isTripCompleted(tripId) {
   const trip = await Trip.findById(tripId);
   if (!trip) return false;
-  return trip.status === 'completed';
+  
+  // If manually marked as completed, return true
+  if (trip.status === 'completed') {
+    return true;
+  }
+  
+  // Calculate based on dates
+  const now = new Date();
+  const startDate = new Date(trip.startDate);
+  const endDate = new Date(trip.endDate);
+  
+  if (now < startDate) return false; // Upcoming
+  if (now >= startDate && now <= endDate) return false; // Active
+  return true; // Completed (past end date)
+}
+
+// Helper: Check if trip is completed (synchronous version for use in other functions)
+function isTripCompletedSync(trip) {
+  if (!trip) return false;
+  
+  // If manually marked as completed, return true
+  if (trip.status === 'completed') {
+    return true;
+  }
+  
+  // Calculate based on dates
+  const now = new Date();
+  const startDate = new Date(trip.startDate);
+  const endDate = new Date(trip.endDate);
+  
+  if (now < startDate) return false; // Upcoming
+  if (now >= startDate && now <= endDate) return false; // Active
+  return true; // Completed (past end date)
 }
 
 // Helper: Check if user can review another user (both must be trip members)
@@ -129,7 +161,7 @@ export const giveReview = async (req, res) => {
     }
 
     // RESTRICTION 1: Only after completing a trip can users post reviews
-    if (trip.status !== 'completed') {
+    if (!isTripCompletedSync(trip)) {
       return res.status(403).json({ 
         message: 'You can only review after the trip is completed.',
         tripStatus: trip.status
@@ -225,10 +257,14 @@ export const giveReview = async (req, res) => {
       ? 'Review submitted and published.' 
       : 'Review submitted but rejected due to content policy violations.';
     
+    // Populate the reviewer data before sending response
+    const populatedReview = await Review.findById(newReview._id)
+      .populate('reviewer', 'name email username profileImage');
+    
     res.status(201).json({ 
       message: responseMessage, 
       review: {
-        ...newReview.toObject(),
+        ...populatedReview.toObject(),
         moderationIssues: moderationResult.passed ? null : moderationResult.issues
       }
     });
@@ -246,7 +282,7 @@ export const getUserReviews = async (req, res) => {
   try {
     const { userId } = req.params;
     const reviews = await Review.find({ reviewedUser: userId, reviewType: 'user' })
-      .populate('reviewer', 'name email')
+      .populate('reviewer', 'name email username profileImage')
       .populate('tripId', 'destination date');
     res.status(200).json(reviews);
   } catch (err) {
@@ -260,7 +296,7 @@ export const getTripReviews = async (req, res) => {
   try {
     const { tripId } = req.params;
     const reviews = await Review.find({ tripId, reviewType: 'trip' })
-      .populate('reviewer', 'name email');
+      .populate('reviewer', 'name email username profileImage');
     res.status(200).json(reviews);
   } catch (err) {
     console.error('❌ Fetch Trip Reviews Error:', err);
@@ -286,14 +322,14 @@ export const getAllReviews = async (req, res) => {
     
     const skip = (Number(page) - 1) * Number(limit);
     const reviews = await Review.find(filter)
-      .populate('reviewer', 'name email')
-      .populate('reviewedUser', 'name email')
+      .populate('reviewer', 'name email username profileImage')
+      .populate('reviewedUser', 'name email username profileImage')
       .populate({
         path: 'tripId',
         select: 'destination description startDate endDate budget tripType status',
         populate: {
           path: 'creator',
-          select: 'name email'
+          select: 'name email username profileImage'
         }
       })
       .sort({ createdAt: -1 })
@@ -315,14 +351,14 @@ export const getReviewsForModeration = async (req, res) => {
     
     const skip = (Number(page) - 1) * Number(limit);
     const reviews = await Review.find(filter)
-      .populate('reviewer', 'name email')
-      .populate('reviewedUser', 'name email')
+      .populate('reviewer', 'name email username profileImage')
+      .populate('reviewedUser', 'name email username profileImage')
       .populate({
         path: 'tripId',
         select: 'destination description startDate endDate budget tripType status',
         populate: {
           path: 'creator',
-          select: 'name email'
+          select: 'name email username profileImage'
         }
       })
       .sort({ createdAt: -1 })
@@ -447,12 +483,86 @@ export const unflagReview = async (req, res) => {
   }
 };
 
-// Admin: Delete a review
+// User: Update a review (only the review owner can update)
+export const updateReview = async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const { rating, feedback, tags } = req.body;
+    const userId = req.user.userId;
+
+    // Basic validation
+    if (!rating || !feedback) {
+      return res.status(400).json({ message: 'Rating and feedback are required.' });
+    }
+
+    // Check if review exists
+    const review = await Review.findById(reviewId);
+    if (!review) {
+      return res.status(404).json({ message: 'Review not found.' });
+    }
+
+    // Check if user owns the review
+    if (review.reviewer.toString() !== userId) {
+      return res.status(403).json({ message: 'You can only update your own reviews.' });
+    }
+
+    // Run automated moderation checks
+    const moderationResult = runAutomatedChecks(feedback, rating);
+    let status = 'approved';
+    let adminResponse = '';
+
+    if (!moderationResult.passed) {
+      status = 'rejected';
+      adminResponse = `Auto-rejected: ${moderationResult.issues.join(', ')}`;
+    }
+
+    // Update the review
+    const updatedReview = await Review.findByIdAndUpdate(
+      reviewId,
+      {
+        rating,
+        feedback,
+        tags,
+        status,
+        adminResponse,
+        updatedAt: new Date()
+      },
+      { new: true }
+    ).populate('reviewer', 'name email username profileImage');
+
+    const responseMessage = status === 'approved' 
+      ? 'Review updated and published.' 
+      : 'Review updated but rejected due to content policy violations.';
+    
+    res.status(200).json({ 
+      message: responseMessage, 
+      review: updatedReview
+    });
+  } catch (err) {
+    console.error('❌ Update Review Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// User: Delete a review (only the review owner can delete)
 export const deleteReview = async (req, res) => {
   try {
     const { reviewId } = req.params;
+    const userId = req.user.userId;
+
+    // Check if review exists
+    const review = await Review.findById(reviewId);
+    if (!review) {
+      return res.status(404).json({ message: 'Review not found.' });
+    }
+
+    // Check if user owns the review
+    if (review.reviewer.toString() !== userId) {
+      return res.status(403).json({ message: 'You can only delete your own reviews.' });
+    }
+
     await Review.findByIdAndDelete(reviewId);
-    res.status(200).json({ message: 'Review deleted.' });
+    res.status(200).json({ message: 'Review deleted successfully.' });
   } catch (err) {
     console.error('❌ Delete Review Error:', err);
     res.status(500).json({ message: 'Server error' });
@@ -488,10 +598,13 @@ export const checkReviewPermissions = async (req, res) => {
     permissions.isTripMember = isTripMember;
 
     // Check trip completion
-    if (trip.status !== 'completed') {
+    if (!isTripCompletedSync(trip)) {
       permissions.reason = 'Trip must be completed before reviews can be submitted.';
+      permissions.tripCompleted = false;
       return res.status(200).json(permissions);
     }
+    
+    permissions.tripCompleted = true;
 
     // Check trip membership
     if (!isTripMember) {

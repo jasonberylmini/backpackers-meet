@@ -72,6 +72,12 @@ export default function TripCreation() {
   };
 
   const getTripStatus = (trip) => {
+    // First check if the trip has been manually marked as completed
+    if (trip.status === 'completed') {
+      return 'completed';
+    }
+    
+    // If not manually completed, calculate based on dates
     const now = new Date();
     const startDate = new Date(trip.startDate || trip.date);
     const endDate = new Date(trip.endDate || trip.date);

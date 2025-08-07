@@ -8,11 +8,13 @@ export default function ReviewForm({
   tripId, 
   reviewedUser, 
   onReviewSubmitted, 
-  onCancel 
+  onCancel,
+  editingReview = null,
+  onReviewUpdated = null
 }) {
-  const [rating, setRating] = useState(0);
-  const [feedback, setFeedback] = useState('');
-  const [tags, setTags] = useState([]);
+  const [rating, setRating] = useState(editingReview ? editingReview.rating : 0);
+  const [feedback, setFeedback] = useState(editingReview ? editingReview.feedback : '');
+  const [tags, setTags] = useState(editingReview ? editingReview.tags || [] : []);
   const [submitting, setSubmitting] = useState(false);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [availableTrips, setAvailableTrips] = useState([]);
@@ -30,6 +32,31 @@ export default function ReviewForm({
       fetchAvailableTrips();
     }
   }, [reviewType, tripId, reviewedUser]);
+
+  // Update form state when editingReview changes
+  useEffect(() => {
+    if (editingReview) {
+      setRating(editingReview.rating);
+      setFeedback(editingReview.feedback);
+      setTags(editingReview.tags || []);
+    } else {
+      setRating(0);
+      setFeedback('');
+      setTags([]);
+    }
+  }, [editingReview]);
+
+  // Debug: Log current form state
+  useEffect(() => {
+    console.log('ReviewForm state:', {
+      rating,
+      feedback: feedback.trim(),
+      feedbackLength: feedback.trim().length,
+      reviewType,
+      editingReview: editingReview ? 'yes' : 'no',
+      buttonDisabled: rating === 0 || feedback.trim().length < 10
+    });
+  }, [rating, feedback, reviewType, editingReview]);
 
   const fetchAvailableTrips = async () => {
     try {
@@ -90,7 +117,7 @@ export default function ReviewForm({
       
       const reviewData = {
         reviewType,
-        tripId: selectedTripId,
+        tripId: editingReview ? editingReview.tripId : selectedTripId,
         rating,
         feedback: feedback.trim(),
         tags
@@ -100,28 +127,61 @@ export default function ReviewForm({
         reviewData.reviewedUser = reviewedUser;
       }
 
-      console.log('Submitting review data:', reviewData);
-      const response = await axios.post('/api/reviews/submit', reviewData, { headers });
+      let response;
       
-      console.log('Review submission successful:', response.data);
-      toast.success(response.data.message);
-      onReviewSubmitted(response.data.review);
+      if (editingReview) {
+        // Update existing review
+        console.log('Updating review data:', reviewData);
+        console.log('Making PUT request to:', `/api/reviews/${editingReview._id}`);
+        console.log('Headers:', headers);
+        
+        response = await axios.put(`/api/reviews/${editingReview._id}`, reviewData, { headers });
+        
+        console.log('Review update successful:', response.data);
+        
+        if (onReviewUpdated) {
+          onReviewUpdated(response.data.review);
+        }
+      } else {
+        // Create new review
+        console.log('Submitting review data:', reviewData);
+        console.log('Making POST request to:', '/api/reviews/submit');
+        console.log('Headers:', headers);
+        
+        response = await axios.post('/api/reviews/submit', reviewData, { headers });
+        
+        console.log('Review submission successful:', response.data);
+        
+        if (onReviewSubmitted) {
+          onReviewSubmitted(response.data.review);
+        }
+      }
     } catch (error) {
       console.error('Review submission error:', error);
       console.error('Error response:', error.response?.data);
-      toast.error(error.response?.data?.message || 'Failed to submit review');
+      console.error('Error status:', error.response?.status);
+      console.error('Error message:', error.message);
+      
+      if (error.response?.status === 403) {
+        toast.error(`Access denied: ${error.response.data.message}`);
+      } else if (error.response?.status === 400) {
+        toast.error(`Invalid request: ${error.response.data.message}`);
+      } else if (error.response?.status === 409) {
+        toast.error(`Already reviewed: ${error.response.data.message}`);
+      } else if (error.response?.status === 404) {
+        toast.error(`Not found: ${error.response.data.message}`);
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to submit review');
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
   const getReviewTypeTitle = () => {
-    if (reviewType === 'trip') {
-      return 'Trip Review';
-    } else if (reviewType === 'user') {
-      return 'User Review';
-    }
-    return 'Review';
+    const baseTitle = reviewType === 'trip' ? 'Trip Review' : 
+                     reviewType === 'user' ? 'User Review' : 'Review';
+    return editingReview ? `Edit ${baseTitle}` : baseTitle;
   };
 
   return (
@@ -253,15 +313,27 @@ export default function ReviewForm({
               type="submit"
               className="btn-primary"
               disabled={submitting || rating === 0 || feedback.trim().length < 10}
-              onClick={() => console.log('Button state:', {
-                submitting,
-                rating,
-                feedbackLength: feedback.trim().length,
-                disabled: submitting || rating === 0 || feedback.trim().length < 10
-              })}
+              title={`Rating: ${rating}, Feedback length: ${feedback.trim().length}/10, Submitting: ${submitting}`}
             >
-              {submitting ? 'Submitting...' : 'Submit Review'}
+              {submitting ? 'Submitting...' : editingReview ? 'Update Review' : 'Submit Review'}
             </button>
+            
+            {/* Debug info - only show if button is disabled */}
+            {(submitting || rating === 0 || feedback.trim().length < 10) && (
+              <div style={{ 
+                fontSize: '11px', 
+                color: '#e53e3e', 
+                marginTop: '8px', 
+                padding: '8px', 
+                background: '#fed7d7',
+                borderRadius: '4px',
+                border: '1px solid #feb2b2'
+              }}>
+                <strong>⚠️ Form Requirements:</strong><br/>
+                {rating === 0 && '• Please select a rating'}<br/>
+                {feedback.trim().length < 10 && `• Feedback needs at least 10 characters (currently ${feedback.trim().length})`}
+              </div>
+            )}
           </div>
         </form>
       </div>

@@ -10,7 +10,8 @@ import {
   leaveTrip, 
   updateTrip, 
   deleteTrip,
-  getCompletedTripsWithUser
+  getCompletedTripsWithUser,
+  markTripAsCompleted
 } from '../controllers/tripController.js';
 import { sendNotification } from '../utils/sendNotification.js';
 import Trip from '../models/Trip.js';
@@ -31,6 +32,7 @@ router.post('/join/:tripId', verifyToken, joinTrip);
 router.post('/leave/:tripId', verifyToken, leaveTrip);
 router.put('/update/:tripId', verifyToken, updateTrip);
 router.delete('/delete/:tripId', verifyToken, deleteTrip);
+router.post('/:tripId/complete', verifyToken, markTripAsCompleted);
 
 // Invite user to trip by user ID
 router.post('/:tripId/invite', verifyToken, async (req, res) => {

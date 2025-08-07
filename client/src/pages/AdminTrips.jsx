@@ -8,6 +8,12 @@ import { useAdminRealtime } from '../hooks/useAdminRealtime';
 import '../pages/AdminDashboard.css';
 
 const getTripStatus = (trip) => {
+  // First check if the trip has been manually marked as completed
+  if (trip.status === 'completed') {
+    return 'Completed';
+  }
+  
+  // If not manually completed, calculate based on dates
   const startDate = new Date(trip.startDate || trip.date);
   const endDate = new Date(trip.endDate || trip.date);
   const now = new Date();

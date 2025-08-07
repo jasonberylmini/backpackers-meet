@@ -302,4 +302,73 @@ export const getCompletedTripsWithUser = async (req, res) => {
   }
 };
 
+// Mark trip as completed
+export const markTripAsCompleted = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const userId = req.user.userId;
 
+    const trip = await Trip.findById(tripId);
+    if (!trip) {
+      return res.status(404).json({ message: 'Trip not found' });
+    }
+
+    // Check if user is the creator of this trip
+    if (trip.creator.toString() !== userId) {
+      return res.status(403).json({ message: 'Only the trip creator can mark the trip as completed' });
+    }
+
+    // Check if trip is already completed
+    if (trip.status === 'completed') {
+      return res.status(400).json({ message: 'Trip is already marked as completed' });
+    }
+
+    // Update trip status to completed
+    trip.status = 'completed';
+    trip.moderation.completedAt = new Date();
+    await trip.save();
+
+    logger.info(`Trip ${tripId} marked as completed by user ${userId}`);
+
+    res.status(200).json({ 
+      message: 'Trip marked as completed successfully',
+      trip: {
+        _id: trip._id,
+        destination: trip.destination,
+        status: trip.status,
+        completedAt: trip.moderation.completedAt
+      }
+    });
+  } catch (err) {
+    logger.error("Mark trip as completed error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Auto-complete trips that have passed their end date
+export const autoCompleteExpiredTrips = async () => {
+  try {
+    const now = new Date();
+    const expiredTrips = await Trip.find({
+      status: 'active',
+      endDate: { $lt: now.toISOString().split('T')[0] } // Compare with date string
+    });
+
+    if (expiredTrips.length === 0) {
+      logger.info('No expired trips found to auto-complete');
+      return;
+    }
+
+    const updatePromises = expiredTrips.map(trip => {
+      trip.status = 'completed';
+      trip.moderation.completedAt = new Date();
+      return trip.save();
+    });
+
+    await Promise.all(updatePromises);
+
+    logger.info(`Auto-completed ${expiredTrips.length} expired trips`);
+  } catch (err) {
+    logger.error("Auto-complete expired trips error:", err);
+  }
+};

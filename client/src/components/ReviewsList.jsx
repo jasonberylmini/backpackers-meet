@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import { getDisplayName, getDisplayInitials } from '../utils/userDisplay';
-import ReviewForm from './ReviewForm';
+import { isTripCompleted } from '../utils/tripStatus';
+
 import './ReviewsList.css';
 
 export default function ReviewsList({ 
@@ -11,16 +13,22 @@ export default function ReviewsList({
   userId, 
   trip,
   showReviewForm = false,
-  onReviewSubmitted 
+  onReviewSubmitted,
+  showMemberReviewButton = false,
+  onReviewButtonClick = null,
+  onEditReview = null
 }) {
+  console.log('ReviewsList render:', { reviewType, tripId, userId, trip, showReviewForm, showMemberReviewButton });
+  const navigate = useNavigate();
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(showReviewForm);
+
   const [currentUser, setCurrentUser] = useState(null);
   const [hasReviewed, setHasReviewed] = useState(false);
   const [canReview, setCanReview] = useState(false);
   const [reviewPermissions, setReviewPermissions] = useState(null);
   const [permissionsLoading, setPermissionsLoading] = useState(false);
+
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -69,7 +77,12 @@ export default function ReviewsList({
       setCanReview(response.data.canReview);
     } catch (error) {
       console.error('Failed to check review permissions:', error);
-      setCanReview(false);
+      // Set default permissions instead of failing
+      setCanReview(reviewType === 'trip' ? isTripCompleted(trip) : true);
+      setReviewPermissions({
+        canReview: reviewType === 'trip' ? isTripCompleted(trip) : true,
+        reason: 'Using default permissions due to API error.'
+      });
     } finally {
       setPermissionsLoading(false);
     }
@@ -92,6 +105,7 @@ export default function ReviewsList({
       }
 
       const response = await axios.get(endpoint, { headers });
+      console.log('Reviews data:', response.data);
       setReviews(response.data);
       
       // Check if current user has already reviewed
@@ -135,6 +149,58 @@ export default function ReviewsList({
       console.error('Failed to flag review:', error);
       toast.error('Failed to flag review');
     }
+  };
+
+  const handleEditReview = (review) => {
+    if (onEditReview) {
+      onEditReview(review);
+    } else {
+      // Fallback to local state if no callback provided
+      setEditingReview(review);
+      setShowForm(true);
+    }
+  };
+
+
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!window.confirm('Are you sure you want to delete this review? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.delete(`/api/reviews/${reviewId}`, { headers });
+      toast.success('Review deleted successfully');
+      fetchReviews(); // Refresh the reviews list
+    } catch (error) {
+      console.error('Failed to delete review:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete review');
+    }
+  };
+
+  const isReviewOwner = (review) => {
+    if (!currentUser || !review || !review.reviewer) return false;
+    
+    // Get current user ID (handle different possible field names)
+    const currentUserId = currentUser.id || currentUser._id || currentUser.userId;
+    
+    // Get reviewer ID (handle different possible field names)
+    const reviewerId = review.reviewer._id || review.reviewer.id;
+    
+    console.log('Checking review ownership:', {
+      currentUserId,
+      reviewerId,
+      currentUser,
+      reviewer: review.reviewer
+    });
+    
+    return currentUserId === reviewerId;
+  };
+
+  const handleProfileClick = (reviewerId) => {
+    navigate(`/profile/${reviewerId}`);
   };
 
   const getAverageRating = () => {
@@ -218,26 +284,11 @@ export default function ReviewsList({
           )}
         </div>
 
-        {/* Review Button */}
-        {currentUser && canReview && reviewType === 'user' && userId && trip && trip.status === 'completed' && (
-          // Check if current user is not trying to review themselves
-          (currentUser.id !== userId && currentUser._id !== userId && currentUser.userId !== userId) && (
-            <button 
-              className="btn-primary write-review-btn"
-              onClick={() => setShowForm(true)}
-            >
-              Write a Review
-            </button>
-          )
-        )}
-        {currentUser && canReview && reviewType === 'trip' && trip && trip.status === 'completed' && (
-          <button 
-            className="btn-primary write-review-btn"
-            onClick={() => setShowForm(true)}
-          >
-            Write a Review
-          </button>
-        )}
+
+        
+
+        
+
         
         {/* Show detailed feedback about review restrictions */}
         {currentUser && !canReview && reviewPermissions && (
@@ -273,25 +324,14 @@ export default function ReviewsList({
         )}
         
         {/* Show message if trip is not completed */}
-        {currentUser && trip && trip.status !== 'completed' && (
+        {currentUser && trip && !isTripCompleted(trip) && (
           <div className="review-notice">
             <p>Reviews will be available after the trip is completed.</p>
           </div>
         )}
       </div>
 
-      {/* Review Form - Only show if trip is completed */}
-      {showForm && trip && trip.status === 'completed' && (
-        <div className="review-form-container">
-          <ReviewForm
-            reviewType={reviewType}
-            tripId={tripId}
-            reviewedUser={userId}
-            onReviewSubmitted={handleReviewSubmitted}
-            onCancel={() => setShowForm(false)}
-          />
-        </div>
-      )}
+
 
       {/* Reviews List */}
       <div className="reviews-list">
@@ -299,19 +339,30 @@ export default function ReviewsList({
           reviews.map(review => (
             <div key={review._id} className="review-card">
               <div className="review-header">
-                <div className="reviewer-info">
+                <div className="reviewer-info" 
+                     style={{ cursor: 'pointer' }}
+                     onClick={() => handleProfileClick(review.reviewer._id || review.reviewer.id)}
+                     title="Click to view profile">
                   <div className="reviewer-avatar">
                     {review.reviewer.profileImage ? (
                       <img 
-                        src={review.reviewer.profileImage} 
+                        src={review.reviewer.profileImage.startsWith('http') 
+                          ? review.reviewer.profileImage 
+                          : `http://localhost:5000/uploads/${review.reviewer.profileImage}`
+                        } 
                         alt={getDisplayName(review.reviewer)} 
                         className="reviewer-image"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
                       />
-                    ) : (
-                      <div className="reviewer-placeholder">
-                        {getDisplayInitials(review.reviewer)}
-                      </div>
-                    )}
+                    ) : null}
+                    <div className="reviewer-placeholder" style={{ 
+                      display: review.reviewer.profileImage ? 'none' : 'flex' 
+                    }}>
+                      {getDisplayInitials(review.reviewer)}
+                    </div>
                   </div>
                   <div className="reviewer-details">
                     <div className="reviewer-name">
@@ -320,6 +371,7 @@ export default function ReviewsList({
                     <div className="review-date">
                       {formatDate(review.createdAt)}
                     </div>
+
                   </div>
                 </div>
                 
@@ -343,7 +395,27 @@ export default function ReviewsList({
               </div>
 
               <div className="review-actions">
-                {currentUser && (
+                {currentUser && isReviewOwner(review) && (
+                  <div className="owner-actions">
+                    <button 
+                      className="edit-review-btn"
+                      onClick={() => handleEditReview(review)}
+                      title="Edit your review"
+                    >
+                      <i className="icon-edit"></i>
+                      Edit
+                    </button>
+                    <button 
+                      className="delete-review-btn"
+                      onClick={() => handleDeleteReview(review._id)}
+                      title="Delete your review"
+                    >
+                      <i className="icon-delete"></i>
+                      Delete
+                    </button>
+                  </div>
+                )}
+                {currentUser && !isReviewOwner(review) && (
                   <button 
                     className="flag-review-btn"
                     onClick={() => handleFlagReview(review._id)}
@@ -368,28 +440,45 @@ export default function ReviewsList({
                 : 'Be the first to review this user!'
               }
             </p>
-            {currentUser && !hasReviewed && reviewType === 'user' && userId && trip && trip.status === 'completed' && (
-              // Check if current user is not trying to review themselves
-              (currentUser.id !== userId && currentUser._id !== userId && currentUser.userId !== userId) && (
-                <button 
-                  className="btn-primary"
-                  onClick={() => setShowForm(true)}
-                >
-                  Write the First Review
-                </button>
-              )
-            )}
-            {currentUser && !hasReviewed && reviewType === 'trip' && trip && trip.status === 'completed' && (
-              <button 
-                className="btn-primary"
-                onClick={() => setShowForm(true)}
-              >
-                Write the First Review
-              </button>
-            )}
+
           </div>
         )}
       </div>
+      
+      {/* Review Button - Single button at the bottom for all cases */}
+      {currentUser && (
+        (reviewType === 'trip' && trip) || 
+        (reviewType === 'user' && userId && trip && 
+         currentUser.id !== userId && currentUser._id !== userId && currentUser.userId !== userId)
+      ) && (
+        <div style={{ marginTop: '24px', marginBottom: '16px', textAlign: 'center' }}>
+                      <button 
+              className="btn-primary"
+              onClick={() => {
+                if (onReviewButtonClick) {
+                  onReviewButtonClick(userId);
+                } else {
+                  setShowForm(true);
+                }
+              }}
+            style={{ 
+              padding: '12px 24px',
+              fontSize: '14px',
+              fontWeight: '600',
+              minWidth: '160px',
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
+            }}
+          >
+            Write a Review
+          </button>
+        </div>
+      )}
     </div>
   );
 } 
