@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
   verificationStatus: {
     type: String,
     enum: ['pending', 'verified', 'rejected'],
-    default: 'pending'
+    default: null
   },
 
   idDocument: { type: String }, // file path to uploaded ID (image/pdf)

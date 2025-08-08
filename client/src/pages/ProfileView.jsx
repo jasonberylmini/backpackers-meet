@@ -654,13 +654,13 @@ export default function ProfileView() {
                     <i className="icon-friends-large"></i>
                   </div>
                   <h3>No friends yet</h3>
-                  <p>Connect with other travelers to see them here!</p>
+                  <p>Friends are made when you complete trips together with other travelers!</p>
                   <button 
                     className="btn-primary"
-                    onClick={() => navigate('/social')}
+                    onClick={() => navigate('/trips/browse')}
                   >
-                    <i className="icon-search"></i>
-                    Browse Users
+                    <i className="icon-calendar"></i>
+                    Explore Trips
                   </button>
                 </div>
               )}

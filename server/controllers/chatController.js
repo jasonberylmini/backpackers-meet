@@ -3,6 +3,8 @@ import Message from '../models/Message.js';
 import Trip from '../models/Trip.js';
 import User from '../models/User.js';
 import Expense from '../models/Expense.js';
+import Notification from '../models/Notification.js';
+import { sendNotification } from '../utils/sendNotification.js';
 import winston from 'winston';
 
 const logger = winston.createLogger({
@@ -66,7 +68,7 @@ export const getTripChat = async (req, res) => {
     const currentUserId = req.user.userId;
 
     // Check if trip exists and user is a member
-    const trip = await Trip.findById(tripId);
+    const trip = await Trip.findById(tripId).select('destination images creator members');
     if (!trip) {
       return res.status(404).json({ message: 'Trip not found.' });
     }
@@ -99,6 +101,8 @@ export const getTripChat = async (req, res) => {
         type: chat.type,
         name: chat.name,
         tripId: chat.tripId,
+        tripCreator: trip.creator,
+        tripImage: trip.images && trip.images.length > 0 ? trip.images[0] : null,
         participants: chat.participants,
         lastMessage: chat.lastMessage,
         unreadCount: 0
@@ -120,7 +124,7 @@ export const getUserChats = async (req, res) => {
       participants: currentUserId
     }).populate('participants', 'username name profileImage')
       .populate('lastMessage.sender', 'username name profileImage')
-      .populate('tripId', 'destination image')
+      .populate('tripId', 'destination images creator')
       .sort({ 'lastMessage.timestamp': -1, updatedAt: -1 });
 
     // Calculate unread counts for each chat
@@ -137,7 +141,8 @@ export const getUserChats = async (req, res) => {
           type: chat.type,
           name: chat.name,
           tripId: chat.tripId,
-          tripImage: chat.tripId?.image,
+          tripCreator: chat.tripId?.creator,
+          tripImage: chat.tripId?.images && chat.tripId.images.length > 0 ? chat.tripId.images[0] : null,
           participants: chat.participants,
           lastMessage: chat.lastMessage,
           unreadCount
@@ -170,6 +175,29 @@ export const sendMessage = async (req, res) => {
 
     if (!chat.participants.includes(currentUserId)) {
       return res.status(403).json({ message: 'You are not a participant in this chat.' });
+    }
+
+    // Check if user is blocked from sending messages
+    if (chat.blockedUsers && chat.blockedUsers.includes(currentUserId)) {
+      return res.status(403).json({ message: 'You are blocked from sending messages in this chat.' });
+    }
+
+    // For group chats, check if user is still a member of the trip
+    if (chat.type === 'group' && chat.tripId) {
+      const trip = await Trip.findById(chat.tripId).select('members creator status');
+      if (!trip) {
+        return res.status(404).json({ message: 'Trip not found.' });
+      }
+      
+      // Check if user is still a member or creator
+      if (!trip.members.includes(currentUserId) && trip.creator.toString() !== currentUserId) {
+        return res.status(403).json({ message: 'You are no longer a member of this trip and cannot send messages.' });
+      }
+      
+      // Check if trip is completed (optional: block messages after trip completion)
+      if (trip.status === 'completed') {
+        return res.status(403).json({ message: 'This trip has been completed. Messages are no longer allowed.' });
+      }
     }
 
     // Create message
@@ -213,10 +241,39 @@ export const sendMessage = async (req, res) => {
     chat.updatedAt = new Date();
     await chat.save();
 
+    // Send notifications to other participants
+    const otherParticipants = chat.participants.filter(participantId => 
+      participantId.toString() !== currentUserId.toString()
+    );
+
+    // Get sender info for notification
+    const sender = await User.findById(currentUserId).select('name username');
+    
+    for (const participantId of otherParticipants) {
+      try {
+        // Create notification for new message
+        await sendNotification({
+          user: { _id: participantId },
+          type: 'message',
+          title: chat.type === 'personal' ? `New message from ${sender.name || sender.username}` : `New message in ${chat.name}`,
+          message: text.length > 50 ? `${text.substring(0, 50)}...` : text,
+          data: {
+            chatId: chat._id,
+            tripId: chat.tripId,
+            tripName: chat.name,
+            actionUrl: `/messages?chat=${chat._id}`
+          },
+          sentBy: currentUserId
+        });
+      } catch (error) {
+        console.error(`Failed to send notification to user ${participantId}:`, error);
+      }
+    }
+
     // Emit socket event for real-time updates
     const io = req.app.get('io');
     if (io) {
-      io.to(chatId).emit('newMessage', {
+      const messageData = {
         chatId,
         message: {
           _id: message._id,
@@ -230,8 +287,17 @@ export const sendMessage = async (req, res) => {
           sentAt: message.sentAt,
           replyTo: message.replyTo,
           attachments: message.attachments,
-          reactions: message.reactions || []
+          reactions: message.reactions || [],
+          status: message.status
         }
+      };
+      
+      // Emit to chat room
+      io.to(`chat_${chatId}`).emit('newMessage', messageData);
+      
+      // Also emit to individual users for notification purposes
+      otherParticipants.forEach(participantId => {
+        io.to(`user_${participantId}`).emit('newMessage', messageData);
       });
     }
 
@@ -544,6 +610,157 @@ export const deleteChat = async (req, res) => {
     });
   } catch (err) {
     logger.error('Delete Chat Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Block user from sending messages in a chat
+export const blockUser = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { userId } = req.body;
+    const currentUserId = req.user.userId;
+
+    // Validate chat exists
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({ message: 'Chat not found.' });
+    }
+
+    // Check if current user has permission to block (creator or admin)
+    if (chat.type === 'group' && chat.tripId) {
+      const trip = await Trip.findById(chat.tripId).select('creator');
+      if (!trip) {
+        return res.status(404).json({ message: 'Trip not found.' });
+      }
+      
+      if (trip.creator.toString() !== currentUserId) {
+        return res.status(403).json({ message: 'Only trip creator can block users.' });
+      }
+    } else if (chat.type === 'personal') {
+      // For personal chats, either participant can block the other
+      if (!chat.participants.includes(currentUserId)) {
+        return res.status(403).json({ message: 'You are not a participant in this chat.' });
+      }
+    }
+
+    // Check if user to block is a participant
+    if (!chat.participants.includes(userId)) {
+      return res.status(400).json({ message: 'User is not a participant in this chat.' });
+    }
+
+    // Add user to blocked list if not already blocked
+    if (!chat.blockedUsers.includes(userId)) {
+      chat.blockedUsers.push(userId);
+      await chat.save();
+    }
+
+    res.status(200).json({
+      message: 'User blocked successfully.',
+      blockedUsers: chat.blockedUsers
+    });
+  } catch (err) {
+    logger.error('Block User Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Unblock user from sending messages in a chat
+export const unblockUser = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { userId } = req.body;
+    const currentUserId = req.user.userId;
+
+    // Validate chat exists
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({ message: 'Chat not found.' });
+    }
+
+    // Check if current user has permission to unblock (creator or admin)
+    if (chat.type === 'group' && chat.tripId) {
+      const trip = await Trip.findById(chat.tripId).select('creator');
+      if (!trip) {
+        return res.status(404).json({ message: 'Trip not found.' });
+      }
+      
+      if (trip.creator.toString() !== currentUserId) {
+        return res.status(403).json({ message: 'Only trip creator can unblock users.' });
+      }
+    } else if (chat.type === 'personal') {
+      // For personal chats, either participant can unblock the other
+      if (!chat.participants.includes(currentUserId)) {
+        return res.status(403).json({ message: 'You are not a participant in this chat.' });
+      }
+    }
+
+    // Remove user from blocked list
+    chat.blockedUsers = chat.blockedUsers.filter(id => id.toString() !== userId);
+    await chat.save();
+
+    res.status(200).json({
+      message: 'User unblocked successfully.',
+      blockedUsers: chat.blockedUsers
+    });
+  } catch (err) {
+    logger.error('Unblock User Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get blocked users for a chat
+export const getBlockedUsers = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const currentUserId = req.user.userId;
+
+    // Validate chat exists and user is participant
+    const chat = await Chat.findById(chatId)
+      .populate('blockedUsers', 'username name profileImage');
+    
+    if (!chat) {
+      return res.status(404).json({ message: 'Chat not found.' });
+    }
+
+    if (!chat.participants.includes(currentUserId)) {
+      return res.status(403).json({ message: 'You are not a participant in this chat.' });
+    }
+
+    res.status(200).json({
+      blockedUsers: chat.blockedUsers || []
+    });
+  } catch (err) {
+    logger.error('Get Blocked Users Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get unread message count for current user
+export const getUnreadMessageCount = async (req, res) => {
+  try {
+    const currentUserId = req.user.userId;
+
+    // Get all chats where user is a participant
+    const userChats = await Chat.find({
+      participants: currentUserId
+    }).select('_id');
+
+    const chatIds = userChats.map(chat => chat._id);
+
+    // Count unread messages (messages not sent by current user and not read)
+    const unreadCount = await Message.countDocuments({
+      chatId: { $in: chatIds },
+      sender: { $ne: currentUserId },
+      status: { $ne: 'read' }
+    });
+
+    res.status(200).json({
+      unreadCount,
+      message: 'Unread message count retrieved successfully.'
+    });
+  } catch (err) {
+    logger.error('Get Unread Message Count Error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };

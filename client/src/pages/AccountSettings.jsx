@@ -17,10 +17,13 @@ export default function AccountSettings() {
   const [deleteStep, setDeleteStep] = useState(1); // 1: initial, 2: final confirmation
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [blockedUsers, setBlockedUsers] = useState([]);
+  const [blockedUsersLoading, setBlockedUsersLoading] = useState(false);
+  const [unblockingUsers, setUnblockingUsers] = useState(new Set());
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchUserData();
+    fetchBlockedUsers();
   }, []);
 
   const fetchUserData = async () => {
@@ -38,6 +41,51 @@ export default function AccountSettings() {
       console.error('Failed to fetch user data:', error);
       setLoading(false);
       toast.error('Failed to load account settings');
+    }
+  };
+
+  const fetchBlockedUsers = async () => {
+    try {
+      setBlockedUsersLoading(true);
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const response = await axios.get('/api/users/blocked/list', { headers });
+      setBlockedUsers(response.data.blockedUsers || []);
+    } catch (error) {
+      console.error('Failed to fetch blocked users:', error);
+      if (error.response?.status === 401) {
+        // User is not authenticated, redirect to login
+        localStorage.clear();
+        navigate('/login');
+        toast.error('Please log in to continue');
+      } else {
+        toast.error('Failed to load blocked users');
+      }
+    } finally {
+      setBlockedUsersLoading(false);
+    }
+  };
+
+  const handleUnblockUser = async (userId) => {
+    try {
+      setUnblockingUsers(prev => new Set(prev).add(userId));
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.post(`/api/users/${userId}/unblock`, {}, { headers });
+      
+      toast.success('User unblocked successfully');
+      fetchBlockedUsers(); // Refresh the blocked users list
+    } catch (error) {
+      console.error('Failed to unblock user:', error);
+      toast.error('Failed to unblock user');
+    } finally {
+      setUnblockingUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
     }
   };
 
@@ -97,12 +145,18 @@ export default function AccountSettings() {
       await axios.delete('/api/users/profile', { headers });
       
       toast.success('Account deleted successfully');
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      navigate('/');
+      
+      // Clear all local storage and redirect
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Force redirect to home page with a small delay to ensure toast shows
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
     } catch (error) {
       console.error('Failed to delete account:', error);
-      toast.error('Failed to delete account');
+      toast.error(error.response?.data?.message || 'Failed to delete account');
     } finally {
       setSaving(false);
       setShowDeleteConfirm(false);
@@ -338,27 +392,38 @@ export default function AccountSettings() {
             <p>Manage your blocked users list</p>
           </div>
           <div className="blocked-users-content">
-            {blockedUsers.length > 0 ? (
+            {blockedUsersLoading ? (
+              <div className="loading-state">
+                <div className="loading-spinner"></div>
+                <p>Loading blocked users...</p>
+              </div>
+            ) : blockedUsers.length > 0 ? (
               <div className="blocked-users-list">
                 {blockedUsers.map(user => (
                   <div key={user._id} className="blocked-user-item">
                     <div className="user-info">
                       <div className="user-avatar">
                         {user.profileImage ? (
-                          <img src={`/uploads/${user.profileImage}`} alt={user.name} />
-                        ) : (
-                          <div className="avatar-placeholder small">
-                            {user.name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                          <img src={`/uploads/${user.profileImage}`} alt={user.name} onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }} />
+                        ) : null}
+                        <div className="avatar-placeholder small" style={{ display: user.profileImage ? 'none' : 'flex' }}>
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
                       </div>
                       <div className="user-details">
                         <h4>{user.name}</h4>
-                        <p>@{user.username}</p>
+                        <p>@{user.username || 'user'}</p>
                       </div>
                     </div>
-                    <button className="btn btn-outline">
-                      Unblock
+                    <button 
+                      className="btn btn-outline" 
+                      onClick={() => handleUnblockUser(user._id)}
+                      disabled={unblockingUsers.has(user._id)}
+                    >
+                      {unblockingUsers.has(user._id) ? 'Unblocking...' : 'Unblock'}
                     </button>
                   </div>
                 ))}

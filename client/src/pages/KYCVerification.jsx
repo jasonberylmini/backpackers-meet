@@ -8,6 +8,7 @@ export default function KYCVerification() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [currentStep, setCurrentStep] = useState('upload');
   const [formData, setFormData] = useState({
     idDocument: null,
     selfie: null
@@ -29,6 +30,17 @@ export default function KYCVerification() {
       
       const response = await axios.get('/api/users/profile', { headers });
       setUser(response.data);
+      
+      if (response.data.verificationStatus === 'verified') {
+        setCurrentStep('success');
+      } else if (response.data.verificationStatus === 'pending') {
+        setCurrentStep('pending');
+      } else if (response.data.verificationStatus === 'rejected') {
+        setCurrentStep('rejected');
+      } else {
+        setCurrentStep('upload');
+      }
+      
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch user data:', error);
@@ -40,16 +52,20 @@ export default function KYCVerification() {
   const handleFileUpload = (e, type) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
         toast.error('File size must be less than 5MB');
         return;
       }
 
-      // Validate file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
       if (!allowedTypes.includes(file.type)) {
         toast.error('Please upload a valid image file (JPEG, JPG, or PNG)');
+        return;
+      }
+
+      // Additional validation for file content
+      if (file.size < 1000) { // Less than 1KB might be too small for a real image
+        toast.error('File seems too small. Please ensure you\'re uploading a real image file.');
         return;
       }
 
@@ -58,7 +74,6 @@ export default function KYCVerification() {
         [type]: file
       }));
 
-      // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
         setPreviews(prev => ({
@@ -67,6 +82,10 @@ export default function KYCVerification() {
         }));
       };
       reader.readAsDataURL(file);
+      
+      // Show success message
+      const fileType = type === 'idDocument' ? 'ID document' : 'selfie';
+      toast.success(`${fileType} uploaded successfully!`);
     }
   };
 
@@ -96,49 +115,41 @@ export default function KYCVerification() {
       
       const data = new FormData();
       data.append('idDocument', formData.idDocument);
-      data.append('selfie', formData.selfie);
+      data.append('idSelfie', formData.selfie);
       
-      await axios.post('/api/users/kyc', data, {
+      await axios.put('/api/users/profile', data, {
         headers: {
           ...headers,
           'Content-Type': 'multipart/form-data'
         }
       });
       
-      toast.success('KYC documents submitted successfully! We will review them within 24-48 hours.');
-      navigate('/profile');
+      setCurrentStep('pending');
+      toast.success('KYC documents submitted successfully!');
+      await fetchUserData();
     } catch (error) {
       console.error('Failed to submit KYC:', error);
-      toast.error(error.response?.data?.message || 'Failed to submit KYC documents');
+      
+      if (error.response?.status === 413) {
+        toast.error('Files are too large. Please ensure each file is less than 5MB.');
+      } else if (error.response?.status === 400) {
+        toast.error('Invalid file format. Please upload JPEG, JPG, or PNG files only.');
+      } else if (error.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+      } else if (error.response?.status === 500) {
+        toast.error('Server error. Please try again later.');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to submit KYC documents. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'verified':
-        return { bg: '#d1fae5', text: '#065f46', icon: '✅' };
-      case 'pending':
-        return { bg: '#fef3c7', text: '#92400e', icon: '⏳' };
-      case 'rejected':
-        return { bg: '#fee2e2', text: '#dc2626', icon: '❌' };
-      default:
-        return { bg: '#f3f4f6', text: '#6b7280', icon: '📋' };
-    }
-  };
-
-  const getStatusMessage = (status) => {
-    switch (status) {
-      case 'verified':
-        return 'Your account has been verified successfully!';
-      case 'pending':
-        return 'Your documents are under review. This usually takes 24-48 hours.';
-      case 'rejected':
-        return 'Your verification was rejected. Please check the requirements and try again.';
-      default:
-        return 'Please complete your KYC verification to unlock all features.';
-    }
+  const handleReupload = () => {
+    setCurrentStep('upload');
+    setFormData({ idDocument: null, selfie: null });
+    setPreviews({ idDocument: null, selfie: null });
   };
 
   if (loading) {
@@ -158,13 +169,8 @@ export default function KYCVerification() {
       <header className="kyc-header">
         <div className="header-content">
           <div className="header-text">
-            <h1>KYC Verification</h1>
-            <p>
-              {user.verificationStatus === 'verified' 
-                ? 'Your identity has been verified successfully' 
-                : 'Verify your identity to unlock all platform features'
-              }
-            </p>
+            <h1>Identity Verification</h1>
+            <p>Complete your KYC to unlock all platform features</p>
           </div>
           <button 
             className="back-btn"
@@ -175,50 +181,25 @@ export default function KYCVerification() {
         </div>
       </header>
 
-      {/* Status Section - Only show for non-verified users */}
-      {user.verificationStatus !== 'verified' && (
-        <section className="kyc-status">
-          <div className="status-card">
-            <div className="status-header">
-              <div 
-                className="status-badge"
-                style={{ 
-                  backgroundColor: getStatusColor(user.verificationStatus).bg,
-                  color: getStatusColor(user.verificationStatus).text
-                }}
-              >
-                <span className="status-icon">
-                  {getStatusColor(user.verificationStatus).icon}
-                </span>
-                <span className="status-text">
-                  {user.verificationStatus === 'verified' ? 'Verified' : 
-                   user.verificationStatus === 'pending' ? 'Under Review' :
-                   user.verificationStatus === 'rejected' ? 'Rejected' : 'Not Verified'}
-                </span>
-              </div>
+      {/* Main Content */}
+      <div className="kyc-content">
+        {currentStep === 'upload' && (
+          <div className="upload-section">
+            <div className="section-header">
+              <h2>Upload Your Documents</h2>
+              <p>Please provide clear, high-quality images of your identity documents</p>
             </div>
-            <p className="status-message">
-              {getStatusMessage(user.verificationStatus)}
-            </p>
-          </div>
-        </section>
-      )}
 
-      {/* Verification Form */}
-      {user.verificationStatus !== 'verified' && (
-        <section className="kyc-form-section">
-          <div className="form-container">
-            <h2>Upload Documents</h2>
-            <p className="form-description">
-              Please upload clear, high-quality images of your documents. 
-              All information will be kept secure and confidential.
-            </p>
-
-            <form onSubmit={handleSubmit} className="kyc-form">
+            <form onSubmit={handleSubmit} className="upload-form">
               {/* ID Document Upload */}
-              <div className="upload-section">
-                <h3>📄 Identity Document</h3>
-                <p>Upload a valid government-issued ID (Passport, Driver's License, Aadhar Card, etc.)</p>
+              <div className="upload-card">
+                <div className="upload-header">
+                  <div className="upload-icon">📄</div>
+                  <div className="upload-info">
+                    <h3>Identity Document</h3>
+                    <p>Passport, Driver's License, Aadhar Card, etc.</p>
+                  </div>
+                </div>
                 
                 <div className="upload-area">
                   {previews.idDocument ? (
@@ -242,7 +223,7 @@ export default function KYCVerification() {
                         className="file-input"
                       />
                       <label htmlFor="idDocument" className="upload-label">
-                        <div className="upload-icon">📄</div>
+                        <div className="upload-icon-large">📄</div>
                         <div className="upload-text">
                           <span className="upload-title">Click to upload ID document</span>
                           <span className="upload-subtitle">JPEG, JPG, or PNG (max 5MB)</span>
@@ -254,9 +235,14 @@ export default function KYCVerification() {
               </div>
 
               {/* Selfie Upload */}
-              <div className="upload-section">
-                <h3>📸 Selfie with ID</h3>
-                <p>Take a clear selfie while holding your ID document next to your face</p>
+              <div className="upload-card">
+                <div className="upload-header">
+                  <div className="upload-icon">📸</div>
+                  <div className="upload-info">
+                    <h3>Selfie with ID</h3>
+                    <p>Take a clear selfie while holding your ID document</p>
+                  </div>
+                </div>
                 
                 <div className="upload-area">
                   {previews.selfie ? (
@@ -280,7 +266,7 @@ export default function KYCVerification() {
                         className="file-input"
                       />
                       <label htmlFor="selfie" className="upload-label">
-                        <div className="upload-icon">📸</div>
+                        <div className="upload-icon-large">📸</div>
                         <div className="upload-text">
                           <span className="upload-title">Click to upload selfie</span>
                           <span className="upload-subtitle">JPEG, JPG, or PNG (max 5MB)</span>
@@ -289,19 +275,6 @@ export default function KYCVerification() {
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* Requirements */}
-              <div className="requirements-section">
-                <h3>📋 Requirements</h3>
-                <ul className="requirements-list">
-                  <li>Documents must be clearly visible and not blurry</li>
-                  <li>All text and numbers must be readable</li>
-                  <li>Documents must be current and not expired</li>
-                  <li>Selfie must show your full face clearly</li>
-                  <li>ID document must be visible in the selfie</li>
-                  <li>File size must be less than 5MB per image</li>
-                </ul>
               </div>
 
               {/* Submit Button */}
@@ -323,34 +296,84 @@ export default function KYCVerification() {
               </div>
             </form>
           </div>
-        </section>
-      )}
+        )}
 
-      {/* Success Message for Verified Users */}
-      {user.verificationStatus === 'verified' && (
-        <section className="kyc-success">
-          <div className="success-card">
-            <div className="success-icon">✅</div>
-            <h2>Verification Complete!</h2>
-            <p>Your account has been successfully verified.</p>
-            <div className="success-benefits">
-              <h3>Unlocked Features:</h3>
-              <ul>
-                <li>Create and join trips</li>
-                <li>Access all chat features</li>
-                <li>Use expense tracking</li>
-                <li>Build trust with other travelers</li>
-              </ul>
+        {currentStep === 'pending' && (
+          <div className="pending-section">
+            <div className="pending-card">
+              <div className="pending-icon">⏳</div>
+              <h2>Documents Submitted Successfully!</h2>
+              <p>Thank you for submitting your verification documents. Our team is now reviewing them.</p>
+              <div className="timeline">
+                <div className="timeline-item">
+                  <h4>Review Process</h4>
+                  <p>Our verification team will review your documents within 24-48 hours</p>
+                </div>
+                <div className="timeline-item">
+                  <h4>Notification</h4>
+                  <p>You'll receive a notification once the review is complete</p>
+                </div>
+              </div>
+              <button 
+                className="primary-btn"
+                onClick={() => navigate('/profile')}
+              >
+                Back to Profile
+              </button>
             </div>
-            <button 
-              className="primary-btn"
-                              onClick={() => navigate('/social')}
-            >
-                              Go to Social Feed
-            </button>
           </div>
-        </section>
-      )}
+        )}
+
+        {currentStep === 'success' && (
+          <div className="success-section">
+            <div className="success-card">
+              <div className="success-icon">✅</div>
+              <h2>Verification Complete!</h2>
+              <p>Your account has been successfully verified.</p>
+              <div className="benefits">
+                <h3>Unlocked Features:</h3>
+                <ul>
+                  <li>Create and join trips</li>
+                  <li>Access all chat features</li>
+                  <li>Use expense tracking</li>
+                  <li>Build trust with travelers</li>
+                </ul>
+              </div>
+              <button 
+                className="primary-btn"
+                onClick={() => navigate('/social')}
+              >
+                Explore Trips
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 'rejected' && (
+          <div className="rejected-section">
+            <div className="rejected-card">
+              <div className="rejected-icon">❌</div>
+              <h2>Verification Rejected</h2>
+              <p>Your verification documents were not approved. Please review the requirements and try again.</p>
+              <div className="rejection-reasons">
+                <h3>Common Reasons for Rejection:</h3>
+                <ul>
+                  <li>Documents are blurry or unclear</li>
+                  <li>Information is not fully visible</li>
+                  <li>Documents are expired</li>
+                  <li>Selfie doesn't clearly show your face</li>
+                </ul>
+              </div>
+              <button 
+                className="primary-btn"
+                onClick={handleReupload}
+              >
+                Upload New Documents
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
-} 
+}

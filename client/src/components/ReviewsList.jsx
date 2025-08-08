@@ -437,7 +437,7 @@ export default function ReviewsList({
             <p>
               {reviewType === 'trip' 
                 ? 'Be the first to review this trip!' 
-                : 'Be the first to review this user!'
+                : 'Reviews appear here when other travelers review you after completing trips together.'
               }
             </p>
 

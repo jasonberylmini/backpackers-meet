@@ -54,6 +54,12 @@ const chatSchema = new mongoose.Schema({
     ref: 'User'
   }],
   
+  // Blocked users (cannot send messages)
+  blockedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  
   createdAt: {
     type: Date,
     default: Date.now

@@ -5,6 +5,7 @@ import Review from '../models/Review.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken'; 
 import AdminLog from '../models/AdminLog.js';
+import Notification from '../models/Notification.js';
 import { validationResult } from 'express-validator';
 import winston from 'winston';
 import crypto from 'crypto';
@@ -178,6 +179,30 @@ export const updateProfile = async (req, res) => {
       updateFields.verificationStatus = 'pending';
     }
     
+    // If both documents are uploaded, set status to pending
+    if (idDocument && idSelfie) {
+      updateFields.verificationStatus = 'pending';
+      
+      // Create notification for admin about new KYC request
+      await Notification.create({
+        user: req.user.userId,
+        type: 'kyc',
+        title: 'KYC Documents Submitted',
+        message: 'Your KYC documents have been submitted and are under review. You will be notified within 24-48 hours.',
+        read: false
+      });
+      
+      // Emit real-time event for admin dashboard
+      // Note: Commented out to avoid circular import issues
+      // const { emitNewKYCRequest } = await import('../server.js');
+      // emitNewKYCRequest({
+      //   userId: req.user.userId,
+      //   name: req.user.name,
+      //   email: req.user.email,
+      //   submittedAt: new Date()
+      // });
+    }
+    
     const updatedUser = await User.findByIdAndUpdate(
       req.user.userId,
       updateFields,
@@ -207,20 +232,56 @@ export const getUnverifiedUsers = async (req, res) => {
 export const verifyUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { verificationStatus } = req.body;
+    const { verificationStatus, rejectionReason } = req.body;
+    
     const user = await User.findByIdAndUpdate(
       id,
       { verificationStatus },
       { new: true }
     ).select('-passwordHash');
+    
     if (!user) return res.status(404).json({ message: "User not found." });
+    
+    // Create admin log
     await AdminLog.create({
       adminId: req.user.userId,
       action: `Marked user as ${verificationStatus}`,
       targetUserId: id,
-      reason: verificationStatus === 'verified' ? 'KYC accepted' : 'KYC document invalid'
+      reason: verificationStatus === 'verified' ? 'KYC accepted' : `KYC rejected: ${rejectionReason || 'Document invalid'}`
     });
-    res.status(200).json({ message: `User ${verificationStatus}`, user });
+
+    // Create notification for user
+    let notificationMessage = '';
+    let notificationType = '';
+
+    if (verificationStatus === 'verified') {
+      notificationMessage = 'Your KYC verification has been approved! You now have access to all platform features.';
+      notificationType = 'kyc';
+    } else if (verificationStatus === 'rejected') {
+      notificationMessage = `Your KYC verification was rejected. ${rejectionReason ? `Reason: ${rejectionReason}` : 'Please check the requirements and try again.'}`;
+      notificationType = 'warning';
+    }
+
+    if (notificationMessage) {
+      await Notification.create({
+        user: id,
+        type: notificationType,
+        title: verificationStatus === 'verified' ? 'KYC Approved' : 'KYC Rejected',
+        message: notificationMessage,
+        read: false
+      });
+    }
+
+    // Emit real-time event for admin dashboard
+    // Note: We'll comment this out for now to avoid circular import issues
+    // const { emitKYCProcessed } = await import('../server.js');
+    // emitKYCProcessed(id, verificationStatus, user);
+
+    res.status(200).json({ 
+      message: `User ${verificationStatus}`, 
+      user,
+      notificationSent: !!notificationMessage
+    });
   } catch (err) {
     logger.error("Verification error:", err);
     res.status(500).json({ message: "Server error" });
@@ -451,14 +512,20 @@ export const getBlockedUsers = async (req, res) => {
   try {
     const currentUserId = req.user.userId;
     
-    const currentUser = await User.findById(currentUserId).populate('blockedUsers', 'name email profileImage');
+    const currentUser = await User.findById(currentUserId).populate('blockedUsers', 'name email profileImage username');
     if (!currentUser) {
       return res.status(404).json({ message: 'User not found.' });
     }
     
+    // Ensure blocked users have usernames
+    const blockedUsersWithUsernames = (currentUser.blockedUsers || []).map(user => ({
+      ...user.toObject(),
+      username: user.username || 'user'
+    }));
+
     res.status(200).json({ 
-      blockedUsers: currentUser.blockedUsers || [],
-      count: currentUser.blockedUsers ? currentUser.blockedUsers.length : 0
+      blockedUsers: blockedUsersWithUsernames,
+      count: blockedUsersWithUsernames.length
     });
   } catch (err) {
     logger.error('Get Blocked Users Error:', err);
@@ -700,6 +767,40 @@ export const autoAddFriendsFromTrip = async (tripId) => {
     logger.info(`Auto-added friends for completed trip: ${trip.destination} (${allParticipants.length} participants)`);
   } catch (error) {
     logger.error('Auto Add Friends Error:', error);
+  }
+};
+
+// Delete user account
+export const deleteAccount = async (req, res) => {
+  try {
+    const currentUserId = req.user.userId;
+    
+    const currentUser = await User.findById(currentUserId);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+    
+    // Soft delete the user account
+    await User.findByIdAndUpdate(currentUserId, {
+      deletedAt: new Date(),
+      accountStatus: 'deleted',
+      updatedAt: new Date()
+    });
+    
+    // Log the action
+    await AdminLog.create({
+      adminId: currentUserId,
+      action: 'deleted account',
+      targetUserId: currentUserId,
+      outcome: `User ${currentUser.name} deleted their account`
+    });
+    
+    res.status(200).json({ 
+      message: 'Account deleted successfully.'
+    });
+  } catch (err) {
+    logger.error('Delete Account Error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

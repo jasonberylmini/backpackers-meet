@@ -100,12 +100,32 @@ export const getProfileImageUrl = (user) => {
       return user.profileImage;
     }
     
-    // If it's a relative path, construct the full URL
-    // Backend serves static files from /uploads/ at localhost:5000
-    return `http://localhost:5000/uploads/${user.profileImage}`;
+    // Handle both old format (with uploads\) and new format (just filename)
+    const filename = user.profileImage.includes('uploads') ? user.profileImage.split(/[/\\]/).pop() : user.profileImage;
+    // Use full backend URL for local uploads since frontend runs on different port
+    return `http://localhost:5000/uploads/${filename}`;
   }
   
   return null;
+};
+
+/**
+ * Get trip image URL or null if not available
+ * @param {string} tripImage - Trip image path or URL
+ * @returns {string|null} Trip image URL or null
+ */
+export const getTripImageUrl = (tripImage) => {
+  if (!tripImage || !tripImage.trim()) return null;
+  
+  // If it's already a full URL, return as is
+  if (tripImage.startsWith('http://') || tripImage.startsWith('https://')) {
+    return tripImage;
+  }
+  
+  // Handle both old format (with uploads\) and new format (just filename)
+  const filename = tripImage.includes('uploads') ? tripImage.split(/[/\\]/).pop() : tripImage;
+  // Use full backend URL for local uploads since frontend runs on different port
+  return `http://localhost:5000/uploads/${filename}`;
 };
 
 /**

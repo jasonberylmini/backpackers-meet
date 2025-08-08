@@ -11,7 +11,11 @@ import {
   editMessage,
   deleteMessage,
   addMessageReaction,
-  deleteChat
+  deleteChat,
+  blockUser,
+  unblockUser,
+  getBlockedUsers,
+  getUnreadMessageCount
 } from '../controllers/chatController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 
@@ -70,6 +74,7 @@ router.post('/upload/files', verifyToken, upload.array('files', 5), (req, res) =
 router.post('/personal', verifyToken, createPersonalChat);
 router.get('/trip/:tripId', verifyToken, getTripChat);
 router.get('/user-chats', verifyToken, getUserChats);
+router.get('/unread-count', verifyToken, getUnreadMessageCount);
 
 // Message management
 router.post('/:chatId/messages', verifyToken, sendMessage);
@@ -81,5 +86,10 @@ router.post('/messages/:messageId/reactions', verifyToken, addMessageReaction);
 
 // Chat management
 router.delete('/:chatId', verifyToken, deleteChat);
+
+// User blocking management
+router.post('/:chatId/block', verifyToken, blockUser);
+router.post('/:chatId/unblock', verifyToken, unblockUser);
+router.get('/:chatId/blocked-users', verifyToken, getBlockedUsers);
 
 export default router;

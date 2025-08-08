@@ -173,19 +173,25 @@ export default function AdminKYC() {
       toast.success('User verified!');
       fetchAllUsers();
     } catch (err) {
-      toast.error('Failed to verify user.');
+      toast.error(`Failed to verify user: ${err.response?.data?.message || err.message}`);
     }
   };
 
   const handleReject = async (userId) => {
+    const rejectionReason = prompt('Enter rejection reason (optional):');
+    if (rejectionReason === null) return; // User cancelled
+    
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.put(`/api/admin/verify/${userId}`, { verificationStatus: 'rejected' }, { headers });
+      await axios.put(`/api/admin/verify/${userId}`, { 
+        verificationStatus: 'rejected',
+        rejectionReason: rejectionReason || 'Documents do not meet verification requirements'
+      }, { headers });
       toast.success('User rejected!');
       fetchAllUsers();
     } catch (err) {
-      toast.error('Failed to reject user.');
+      toast.error(`Failed to reject user: ${err.response?.data?.message || err.message}`);
     }
   };
 

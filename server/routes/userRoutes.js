@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser, getProfile, updateProfile, getUnverifiedUsers, verifyUser, forgotPassword, resetPassword, validateResetToken, setUserStatus, getUserById, blockUser, unblockUser, getBlockedUsers, getDashboardStats, getDashboardTrips, getUserFriends, addFriend, removeFriend } from '../controllers/userController.js';
+import { registerUser, loginUser, getProfile, updateProfile, getUnverifiedUsers, verifyUser, forgotPassword, resetPassword, validateResetToken, setUserStatus, getUserById, blockUser, unblockUser, getBlockedUsers, getDashboardStats, getDashboardTrips, getUserFriends, addFriend, removeFriend, deleteAccount } from '../controllers/userController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 import isAdmin from '../middlewares/isAdmin.js';
 import upload from '../middlewares/upload.js';
@@ -51,6 +51,7 @@ router.put('/profile', verifyToken, upload.fields([
   { name: 'idDocument', maxCount: 1 },
   { name: 'idSelfie', maxCount: 1 }
 ]), updateProfile);
+router.delete('/profile', verifyToken, deleteAccount);
 
 // Dashboard routes
 router.get('/dashboard/stats', verifyToken, getDashboardStats);

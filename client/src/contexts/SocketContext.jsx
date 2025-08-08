@@ -190,6 +190,13 @@ export const SocketProvider = ({ children }) => {
       });
     });
 
+    // Handle new messages
+    newSocket.on('newMessage', (data) => {
+      console.log('💬 New message received:', data);
+      // Emit a custom event that components can listen to
+      window.dispatchEvent(new CustomEvent('newMessage', { detail: data }));
+    });
+
     setSocket(newSocket);
 
     // Cleanup on unmount
