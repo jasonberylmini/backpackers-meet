@@ -1638,3 +1638,269 @@
     padding: 8px;
   }
 }
+
+/* Enhanced responsive design for Messages */
+@media (max-width: 1200px) {
+  .messages-container {
+    grid-template-columns: 300px 1fr;
+  }
+  
+  .chat-list {
+    width: 300px;
+  }
+  
+  .chat-messages {
+    flex: 1;
+  }
+}
+
+@media (max-width: 1024px) {
+  .messages-container {
+    grid-template-columns: 280px 1fr;
+  }
+  
+  .chat-list {
+    width: 280px;
+  }
+  
+  .chat-header {
+    padding: 1rem 1.25rem;
+  }
+  
+  .chat-messages {
+    padding: 1rem 1.25rem;
+  }
+  
+  .message-input-container {
+    padding: 1rem 1.25rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .messages-container {
+    grid-template-columns: 1fr;
+    height: calc(100vh - 60px);
+  }
+  
+  .chat-list {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    background: #ffffff;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .chat-list.show {
+    transform: translateX(0);
+  }
+  
+  .chat-list-header {
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .chat-list-title {
+    font-size: 1.25rem;
+  }
+  
+  .chat-list-toggle {
+    display: block;
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+  }
+  
+  .chat-messages {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    padding: 1rem;
+  }
+  
+  .chat-header {
+    padding: 1rem;
+    position: sticky;
+    top: 0;
+    background: #ffffff;
+    z-index: 5;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .chat-header-info h3 {
+    font-size: 1.1rem;
+  }
+  
+  .chat-header-info p {
+    font-size: 0.85rem;
+  }
+  
+  .message-input-container {
+    padding: 1rem;
+    position: sticky;
+    bottom: 0;
+    background: #ffffff;
+    border-top: 1px solid #e5e7eb;
+  }
+  
+  .message-input {
+    padding: 0.75rem;
+    font-size: 0.95rem;
+  }
+  
+  .send-button {
+    padding: 0.75rem;
+    width: 40px;
+    height: 40px;
+  }
+  
+  .chat-item {
+    padding: 0.875rem 1rem;
+  }
+  
+  .chat-item-info h4 {
+    font-size: 0.95rem;
+  }
+  
+  .chat-item-info p {
+    font-size: 0.8rem;
+  }
+  
+  .chat-item-time {
+    font-size: 0.75rem;
+  }
+  
+  .message {
+    max-width: 85%;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+  }
+  
+  .message-content {
+    font-size: 0.9rem;
+  }
+  
+  .message-time {
+    font-size: 0.7rem;
+  }
+  
+  .message-input-wrapper {
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .messages-container {
+    height: calc(100vh - 50px);
+  }
+  
+  .chat-list-header {
+    padding: 0.75rem;
+  }
+  
+  .chat-list-title {
+    font-size: 1.1rem;
+  }
+  
+  .chat-list-toggle {
+    width: 35px;
+    height: 35px;
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+  
+  .chat-messages {
+    padding: 0.75rem;
+  }
+  
+  .chat-header {
+    padding: 0.75rem;
+  }
+  
+  .chat-header-info h3 {
+    font-size: 1rem;
+  }
+  
+  .chat-header-info p {
+    font-size: 0.8rem;
+  }
+  
+  .message-input-container {
+    padding: 0.75rem;
+  }
+  
+  .message-input {
+    padding: 0.6rem;
+    font-size: 0.9rem;
+  }
+  
+  .send-button {
+    padding: 0.6rem;
+    width: 35px;
+    height: 35px;
+  }
+  
+  .chat-item {
+    padding: 0.75rem;
+  }
+  
+  .chat-item-info h4 {
+    font-size: 0.9rem;
+  }
+  
+  .chat-item-info p {
+    font-size: 0.75rem;
+  }
+  
+  .message {
+    max-width: 90%;
+    padding: 0.6rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .message-content {
+    font-size: 0.85rem;
+  }
+  
+  .message-time {
+    font-size: 0.65rem;
+  }
+  
+  .empty-chat {
+    padding: 2rem 1rem;
+  }
+  
+  .empty-chat h3 {
+    font-size: 1.1rem;
+  }
+  
+  .empty-chat p {
+    font-size: 0.9rem;
+  }
+  
+  .chat-list-empty {
+    padding: 2rem 1rem;
+  }
+  
+  .chat-list-empty h3 {
+    font-size: 1.1rem;
+  }
+  
+  .chat-list-empty p {
+    font-size: 0.9rem;
+  }
+}

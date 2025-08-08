@@ -284,9 +284,29 @@ export const getReportedTrips = async (req, res) => {
       .skip(skip)
       .limit(Number(limit));
     
+    // Enhance trips with better creator information
+    const enhancedTrips = trips.map(trip => {
+      const enhancedTrip = trip.toObject();
+      
+      // Ensure creator has proper data
+      if (trip.creator) {
+        enhancedTrip.creator = {
+          name: trip.creator.name || 'Unknown Creator',
+          email: trip.creator.email || 'No email'
+        };
+      } else {
+        enhancedTrip.creator = {
+          name: 'Unknown Creator',
+          email: 'No email'
+        };
+      }
+      
+      return enhancedTrip;
+    });
+    
     const total = await Trip.countDocuments(filter);
     
-    res.status(200).json({ trips, total });
+    res.status(200).json({ trips: enhancedTrips, total });
   } catch (err) {
     logger.error("Get reported trips error:", err);
     res.status(500).json({ message: "Server error" });
@@ -529,9 +549,16 @@ export const getReportedUsers = async (req, res) => {
       .skip(skip)
       .limit(Number(limit));
     
+    // Enhance users with additional data
+    const enhancedUsers = users.map(user => ({
+      ...user.toObject(),
+      status: user.isBanned ? 'banned' : user.status || 'active',
+      verificationStatus: user.verificationStatus || 'pending'
+    }));
+    
     const total = await User.countDocuments(filter);
     
-    res.status(200).json({ users, total });
+    res.status(200).json({ users: enhancedUsers, total });
   } catch (err) {
     logger.error("Get reported users error:", err);
     res.status(500).json({ message: "Server error" });
@@ -711,21 +738,57 @@ export const getAllFlags = async (req, res) => {
     const skip = (Number(page) - 1) * Number(limit);
     const flags = await Flag.find(filter)
       .populate('flaggedBy', 'name email')
-      .populate({
-        path: 'targetId',
-        select: 'name email destination description feedback rating',
-        populate: {
-          path: 'creator',
-          select: 'name email'
-        }
-      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
     
+    // Manually populate target data based on flag type
+    const enhancedFlags = await Promise.all(flags.map(async (flag) => {
+      const enhancedFlag = flag.toObject();
+      
+      // Populate target data based on flag type
+      if (flag.flagType === 'user') {
+        const user = await User.findById(flag.targetId).select('name email');
+        enhancedFlag.targetId = {
+          name: user ? user.name : 'Deleted User',
+          email: user ? user.email : 'No email'
+        };
+      } else if (flag.flagType === 'trip') {
+        const trip = await Trip.findById(flag.targetId).populate('creator', 'name email').select('destination description creator');
+        enhancedFlag.targetId = {
+          destination: trip ? trip.destination : 'Deleted Trip',
+          description: trip ? trip.description : 'No description',
+          creator: trip && trip.creator ? {
+            name: trip.creator.name || 'Unknown Creator',
+            email: trip.creator.email || 'No email'
+          } : { name: 'Unknown Creator', email: 'No email' }
+        };
+      } else if (flag.flagType === 'review') {
+        const review = await Review.findById(flag.targetId).select('feedback rating');
+        enhancedFlag.targetId = {
+          feedback: review ? review.feedback : 'Deleted Review',
+          rating: review ? review.rating : 0
+        };
+      }
+      
+      // Ensure flaggedBy has proper data - fix "Anonymous" issue
+      if (flag.flaggedBy) {
+        enhancedFlag.flaggedBy = {
+          name: flag.flaggedBy.name || 'Anonymous User',
+          email: flag.flaggedBy.email || 'No email provided'
+        };
+      } else {
+        enhancedFlag.flaggedBy = { name: 'Anonymous User', email: 'No email provided' };
+      }
+      
+
+      
+      return enhancedFlag;
+    }));
+    
     const total = await Flag.countDocuments(filter);
     
-    res.status(200).json({ flags, total });
+    res.status(200).json({ flags: enhancedFlags, total });
   } catch (err) {
     logger.error("Get all flags error:", err);
     res.status(500).json({ message: "Server error" });
@@ -1061,9 +1124,38 @@ export const getAdminLogs = async (req, res) => {
       .skip(skip)
       .limit(Number(limit));
     
+    // Enhance logs with better fallback data for missing users
+    const enhancedLogs = logs.map(log => {
+      const enhancedLog = log.toObject();
+      
+      // Handle missing admin data
+      if (!enhancedLog.adminId) {
+        enhancedLog.adminId = {
+          name: 'Deleted Admin',
+          email: 'No email available'
+        };
+      } else if (!enhancedLog.adminId.name) {
+        enhancedLog.adminId.name = enhancedLog.adminId.name || 'Unknown Admin';
+        enhancedLog.adminId.email = enhancedLog.adminId.email || 'No email available';
+      }
+      
+      // Handle missing target user data
+      if (!enhancedLog.targetUserId) {
+        enhancedLog.targetUserId = {
+          name: 'Deleted User',
+          email: 'No email available'
+        };
+      } else if (!enhancedLog.targetUserId.name) {
+        enhancedLog.targetUserId.name = enhancedLog.targetUserId.name || 'Unknown User';
+        enhancedLog.targetUserId.email = enhancedLog.targetUserId.email || 'No email available';
+      }
+      
+      return enhancedLog;
+    });
+    
     const total = await AdminLog.countDocuments(filter);
     
-    res.status(200).json({ logs, total, page: Number(page), limit: Number(limit) });
+    res.status(200).json({ logs: enhancedLogs, total, page: Number(page), limit: Number(limit) });
   } catch (err) {
     logger.error("Log Fetch Error:", err);
     res.status(500).json({ message: "Server error" });

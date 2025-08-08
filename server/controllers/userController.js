@@ -435,13 +435,7 @@ export const blockUser = async (req, res) => {
       updatedAt: new Date()
     });
     
-    // Log the action
-    await AdminLog.create({
-      adminId: currentUserId,
-      action: 'blocked user',
-      targetUserId: userId,
-      outcome: `User ${currentUser.name} blocked ${targetUser.name}`
-    });
+    // Note: User blocking is not an admin action, so we don't log it to AdminLog
     
     res.status(200).json({ 
       message: 'User blocked successfully.',
@@ -485,13 +479,7 @@ export const unblockUser = async (req, res) => {
       updatedAt: new Date()
     });
     
-    // Log the action
-    await AdminLog.create({
-      adminId: currentUserId,
-      action: 'unblocked user',
-      targetUserId: userId,
-      outcome: `User ${currentUser.name} unblocked ${targetUser.name}`
-    });
+    // Note: User unblocking is not an admin action, so we don't log it to AdminLog
     
     res.status(200).json({ 
       message: 'User unblocked successfully.',

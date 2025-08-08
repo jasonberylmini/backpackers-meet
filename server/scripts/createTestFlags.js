@@ -117,6 +117,7 @@ async function createTestFlags() {
       testReview1 = new Review({
         reviewer: testUser1._id,
         reviewType: 'user',
+        tripId: testTrip1._id, // Add tripId for user reviews
         reviewedUser: testUser2._id,
         rating: 5,
         feedback: 'Great experience with this user! Very reliable and friendly.',

@@ -285,12 +285,14 @@ export default function AdminReports() {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.patch(`/api/admin/${activeTab}/${itemId}/resolve`, {}, { headers });
-      toast.success('Item resolved successfully!');
       
-      if (activeTab === 'flag') fetchFlagData();
-      else if (activeTab === 'trip') fetchTripData();
-      else if (activeTab === 'user') fetchUserData();
+      if (activeTab === 'flag') {
+        await axios.patch(`/api/admin/flags/${itemId}/resolve`, {}, { headers });
+        toast.success('Flag resolved successfully!');
+        fetchFlagData();
+      } else {
+        toast.error('Resolve action not available for this item type.');
+      }
     } catch (err) {
       toast.error('Failed to resolve item.');
     }
@@ -300,12 +302,14 @@ export default function AdminReports() {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.patch(`/api/admin/${activeTab}/${itemId}/dismiss`, {}, { headers });
-      toast.success('Item dismissed successfully!');
       
-      if (activeTab === 'flag') fetchFlagData();
-      else if (activeTab === 'trip') fetchTripData();
-      else if (activeTab === 'user') fetchUserData();
+      if (activeTab === 'flag') {
+        await axios.patch(`/api/admin/flags/${itemId}/dismiss`, {}, { headers });
+        toast.success('Flag dismissed successfully!');
+        fetchFlagData();
+      } else {
+        toast.error('Dismiss action not available for this item type.');
+      }
     } catch (err) {
       toast.error('Failed to dismiss item.');
     }
@@ -317,12 +321,15 @@ export default function AdminReports() {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.delete(`/api/admin/${activeTab}/${itemId}`, { headers });
-      toast.success('Item deleted successfully!');
       
-      if (activeTab === 'flag') fetchFlagData();
-      else if (activeTab === 'trip') fetchTripData();
-      else if (activeTab === 'user') fetchUserData();
+      if (activeTab === 'trip') {
+        await axios.delete(`/api/admin/trips/${itemId}`, { headers });
+        toast.success('Trip deleted successfully!');
+        fetchTripData();
+      } else if (activeTab === 'user') {
+        // For users, we might want to ban instead of delete
+        toast.error('Delete action not available for users. Use ban instead.');
+      }
     } catch (err) {
       toast.error('Failed to delete item.');
     }
@@ -603,20 +610,6 @@ export default function AdminReports() {
           </button>
         </>
       )}
-      <button 
-        onClick={() => handleDelete(flag._id)}
-        style={{ 
-          padding: '4px 8px',
-          backgroundColor: '#dc3545',
-          color: 'white',
-          border: 'none',
-          borderRadius: 4,
-          fontSize: 12,
-          cursor: 'pointer'
-        }}
-      >
-        Delete
-      </button>
     </div>
   );
 
@@ -1027,11 +1020,11 @@ export default function AdminReports() {
                 <div style={{ fontWeight: 'bold', fontSize: 16 }}>
                   {(() => {
                     if (data.targetId) {
-                      if (data.flagType === 'user') {
+                      if (type === 'user') {
                         return data.targetId.name || 'Unknown User';
-                      } else if (data.flagType === 'trip') {
+                      } else if (type === 'trip') {
                         return data.targetId.destination || 'Unknown Trip';
-                      } else if (data.flagType === 'review') {
+                      } else if (type === 'review') {
                         return data.targetId.feedback?.substring(0, 30) || 'Unknown Review';
                       }
                     }
@@ -1041,15 +1034,15 @@ export default function AdminReports() {
                 <div style={{ color: '#6c757d', fontSize: 14 }}>
                   {(() => {
                     if (data.targetId) {
-                      if (data.flagType === 'user') {
+                      if (type === 'user') {
                         return data.targetId.email || 'No email';
-                      } else if (data.flagType === 'trip') {
+                      } else if (type === 'trip') {
                         return data.targetId.creator?.name || 'Unknown Creator';
-                      } else if (data.flagType === 'review') {
+                      } else if (type === 'review') {
                         return data.targetId.rating ? `${data.targetId.rating}★` : 'No rating';
                       }
                     }
-                    return data.flagType || 'Unknown';
+                    return type || 'Unknown';
                   })()}
                 </div>
               </div>

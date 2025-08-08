@@ -13,17 +13,20 @@ export default function AdminModal({ open, onClose, title, children, actions }) 
       zIndex: 1000,
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      padding: '20px'
     }}>
       <div className="admin-modal" style={{
         background: '#fff',
         borderRadius: 12,
         boxShadow: '0 8px 32px rgba(80,80,160,0.18)',
         minWidth: 320,
-        maxWidth: 480,
+        maxWidth: '90vw',
+        maxHeight: '90vh',
         width: '100%',
         padding: 24,
-        position: 'relative'
+        position: 'relative',
+        overflow: 'auto'
       }}>
         <button
           onClick={onClose}

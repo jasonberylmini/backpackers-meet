@@ -457,191 +457,198 @@ export default function AdminKYC() {
 
   // Enhanced KYC modal content
   const renderEnhancedKYCModal = (user) => (
-    <div style={{ padding: 20 }}>
-      {/* User Profile Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-        <div>
-          <h3 style={{ marginBottom: 15, color: '#333' }}>User Information</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div><strong>Name:</strong> {user.name}</div>
-            <div><strong>Email:</strong> {user.email}</div>
-            <div><strong>Phone:</strong> {user.phone || 'Not provided'}</div>
-            <div><strong>Gender:</strong> {user.gender || 'Not specified'}</div>
-            <div><strong>Location:</strong> {user.location || 'Not provided'}</div>
-          </div>
-        </div>
-        <div>
-          <h3 style={{ marginBottom: 15, color: '#333' }}>KYC Details</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div><strong>Status:</strong> 
-              <span style={{ 
-                padding: '4px 8px',
-                borderRadius: 12,
-                fontSize: 12,
-                fontWeight: 'bold',
-                backgroundColor: getStatusColor(user.verificationStatus).bg,
-                color: getStatusColor(user.verificationStatus).text
-              }}>
-                {user.verificationStatus}
-              </span>
-            </div>
-            <div><strong>Applied:</strong> {new Date(user.createdAt).toLocaleString()}</div>
-            <div><strong>Processing Time:</strong> {calculateProcessingTime(user.createdAt)}</div>
-            <div><strong>Last Updated:</strong> {user.updatedAt ? new Date(user.updatedAt).toLocaleString() : 'Never'}</div>
-          </div>
-        </div>
-      </div>
+    <div style={{ 
+      padding: 20,
+      maxHeight: '60vh',
+      overflow: 'auto'
+    }}>
+             {/* User Profile Section */}
+       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+         <div>
+           <h3 style={{ marginBottom: 10, color: '#333', fontSize: 16 }}>User Information</h3>
+           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+             <div><strong>Name:</strong> {user.name}</div>
+             <div><strong>Email:</strong> {user.email}</div>
+             <div><strong>Phone:</strong> {user.phone || 'Not provided'}</div>
+             <div><strong>Gender:</strong> {user.gender || 'Not specified'}</div>
+             <div><strong>Location:</strong> {user.location || 'Not provided'}</div>
+           </div>
+         </div>
+         <div>
+           <h3 style={{ marginBottom: 10, color: '#333', fontSize: 16 }}>KYC Details</h3>
+           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+             <div><strong>Status:</strong> 
+               <span style={{ 
+                 padding: '4px 8px',
+                 borderRadius: 12,
+                 fontSize: 12,
+                 fontWeight: 'bold',
+                 backgroundColor: getStatusColor(user.verificationStatus).bg,
+                 color: getStatusColor(user.verificationStatus).text
+               }}>
+                 {user.verificationStatus}
+               </span>
+             </div>
+             <div><strong>Applied:</strong> {new Date(user.createdAt).toLocaleString()}</div>
+             <div><strong>Processing Time:</strong> {calculateProcessingTime(user.createdAt)}</div>
+             <div><strong>Last Updated:</strong> {user.updatedAt ? new Date(user.updatedAt).toLocaleString() : 'Never'}</div>
+           </div>
+         </div>
+       </div>
       
-      {/* Document Review Section */}
-      <div style={{ marginBottom: 20 }}>
-        <h3 style={{ marginBottom: 15, color: '#333' }}>Document Review</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-          {user.idDocument ? (
-            <div style={{ 
-              padding: 16, 
-              backgroundColor: '#f8f9fa', 
-              borderRadius: 8,
-              border: '2px solid #28a745'
-            }}>
-              <h4 style={{ marginBottom: 10, color: '#28a745' }}>✅ ID Document</h4>
-              <img 
-                src={getImageUrl(user.idDocument)} 
-                alt="ID Document" 
-                style={{ 
-                  width: '100%', 
-                  maxHeight: 200, 
-                  objectFit: 'cover',
-                  borderRadius: 4,
-                  cursor: 'pointer'
-                }}
-                onClick={() => openImageModal(user.idDocument)}
-              />
-              <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
-                Click to enlarge
-              </div>
-            </div>
-          ) : (
-            <div style={{ 
-              padding: 16, 
-              backgroundColor: '#ffebee', 
-              borderRadius: 8,
-              border: '2px solid #d32f2f'
-            }}>
-              <h4 style={{ marginBottom: 10, color: '#d32f2f' }}>❌ ID Document Missing</h4>
-              <div style={{ color: '#666', textAlign: 'center', padding: 20 }}>
-                No ID document uploaded
-              </div>
-            </div>
-          )}
-          
-          {user.idSelfie ? (
-            <div style={{ 
-              padding: 16, 
-              backgroundColor: '#f8f9fa', 
-              borderRadius: 8,
-              border: '2px solid #28a745'
-            }}>
-              <h4 style={{ marginBottom: 10, color: '#28a745' }}>✅ Selfie with Document</h4>
-              <img 
-                src={getImageUrl(user.idSelfie)} 
-                alt="Selfie with Document" 
-                style={{ 
-                  width: '100%', 
-                  maxHeight: 200, 
-                  objectFit: 'cover',
-                  borderRadius: 4,
-                  cursor: 'pointer'
-                }}
-                onClick={() => openImageModal(user.idSelfie)}
-              />
-              <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
-                Click to enlarge
-              </div>
-            </div>
-          ) : (
-            <div style={{ 
-              padding: 16, 
-              backgroundColor: '#ffebee', 
-              borderRadius: 8,
-              border: '2px solid #d32f2f'
-            }}>
-              <h4 style={{ marginBottom: 10, color: '#d32f2f' }}>❌ Selfie Missing</h4>
-              <div style={{ color: '#666', textAlign: 'center', padding: 20 }}>
-                No selfie uploaded
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+             {/* Document Review Section */}
+       <div style={{ marginBottom: 16 }}>
+         <h3 style={{ marginBottom: 12, color: '#333', fontSize: 16 }}>Document Review</h3>
+         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+           {user.idDocument ? (
+             <div style={{ 
+               padding: 12, 
+               backgroundColor: '#f8f9fa', 
+               borderRadius: 8,
+               border: '2px solid #28a745'
+             }}>
+               <h4 style={{ marginBottom: 8, color: '#28a745', fontSize: 14 }}>✅ ID Document</h4>
+               <img 
+                 src={getImageUrl(user.idDocument)} 
+                 alt="ID Document" 
+                 style={{ 
+                   width: '100%', 
+                   maxHeight: 120, 
+                   objectFit: 'cover',
+                   borderRadius: 4,
+                   cursor: 'pointer'
+                 }}
+                 onClick={() => openImageModal(user.idDocument)}
+               />
+               <div style={{ marginTop: 6, fontSize: 11, color: '#666' }}>
+                 Click to enlarge
+               </div>
+             </div>
+           ) : (
+             <div style={{ 
+               padding: 12, 
+               backgroundColor: '#ffebee', 
+               borderRadius: 8,
+               border: '2px solid #d32f2f'
+             }}>
+               <h4 style={{ marginBottom: 8, color: '#d32f2f', fontSize: 14 }}>❌ ID Document Missing</h4>
+               <div style={{ color: '#666', textAlign: 'center', padding: 12, fontSize: 12 }}>
+                 No ID document uploaded
+               </div>
+             </div>
+           )}
+           
+           {user.idSelfie ? (
+             <div style={{ 
+               padding: 12, 
+               backgroundColor: '#f8f9fa', 
+               borderRadius: 8,
+               border: '2px solid #28a745'
+             }}>
+               <h4 style={{ marginBottom: 8, color: '#28a745', fontSize: 14 }}>✅ Selfie with Document</h4>
+               <img 
+                 src={getImageUrl(user.idSelfie)} 
+                 alt="Selfie with Document" 
+                 style={{ 
+                   width: '100%', 
+                   maxHeight: 120, 
+                   objectFit: 'cover',
+                   borderRadius: 4,
+                   cursor: 'pointer'
+                 }}
+                 onClick={() => openImageModal(user.idSelfie)}
+               />
+               <div style={{ marginTop: 6, fontSize: 11, color: '#666' }}>
+                 Click to enlarge
+               </div>
+             </div>
+           ) : (
+             <div style={{ 
+               padding: 12, 
+               backgroundColor: '#ffebee', 
+               borderRadius: 8,
+               border: '2px solid #d32f2f'
+             }}>
+               <h4 style={{ marginBottom: 8, color: '#d32f2f', fontSize: 14 }}>❌ Selfie Missing</h4>
+               <div style={{ color: '#666', textAlign: 'center', padding: 12, fontSize: 12 }}>
+                 No selfie uploaded
+               </div>
+             </div>
+           )}
+         </div>
+       </div>
       
-      {/* KYC Decision Section */}
-      <div style={{ 
-        padding: 16, 
-        backgroundColor: '#f8f9fa', 
-        borderRadius: 8,
-        border: '1px solid #e1e5e9'
-      }}>
-        <h3 style={{ marginBottom: 15, color: '#333' }}>KYC Decision</h3>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button 
-            onClick={() => handleVerify(user._id)}
-            disabled={user.verificationStatus === 'verified'}
-            style={{ 
-              padding: '12px 24px',
-              backgroundColor: user.verificationStatus === 'verified' ? '#ccc' : '#28a745',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              cursor: user.verificationStatus === 'verified' ? 'not-allowed' : 'pointer',
-              fontSize: 14,
-              fontWeight: 'bold'
-            }}
-          >
-            ✅ Approve KYC
+             {/* KYC Decision Section */}
+       <div style={{ 
+         padding: 12, 
+         backgroundColor: '#f8f9fa', 
+         borderRadius: 8,
+         border: '1px solid #e1e5e9',
+         position: 'sticky',
+         bottom: 0,
+         marginTop: 12
+       }}>
+         <h3 style={{ marginBottom: 10, color: '#333', fontSize: 15 }}>KYC Decision</h3>
+         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+           <button 
+             onClick={() => handleVerify(user._id)}
+             disabled={user.verificationStatus === 'verified'}
+             style={{ 
+               padding: '8px 16px',
+               backgroundColor: user.verificationStatus === 'verified' ? '#ccc' : '#28a745',
+               color: 'white',
+               border: 'none',
+               borderRadius: 6,
+               cursor: user.verificationStatus === 'verified' ? 'not-allowed' : 'pointer',
+               fontSize: 12,
+               fontWeight: 'bold'
+             }}
+           >
+             ✅ Approve KYC
           </button>
-          <button 
-            onClick={() => handleReject(user._id)}
-            disabled={user.verificationStatus === 'rejected'}
-            style={{ 
-              padding: '12px 24px',
-              backgroundColor: user.verificationStatus === 'rejected' ? '#ccc' : '#d32f2f',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              cursor: user.verificationStatus === 'rejected' ? 'not-allowed' : 'pointer',
-              fontSize: 14,
-              fontWeight: 'bold'
-            }}
-          >
-            ❌ Reject KYC
-          </button>
-          <button 
-            onClick={() => sendKYCNotification(user._id)}
-            style={{ 
-              padding: '12px 24px',
-              backgroundColor: '#1976d2',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              cursor: 'pointer',
-              fontSize: 14
-            }}
-          >
-            📧 Send Message
-          </button>
-          <button 
-            onClick={() => closeUserModal()}
-            style={{ 
-              padding: '12px 24px',
-              backgroundColor: '#666',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              cursor: 'pointer',
-              fontSize: 14
-            }}
-          >
-            Close
+                     <button 
+             onClick={() => handleReject(user._id)}
+             disabled={user.verificationStatus === 'rejected'}
+             style={{ 
+               padding: '8px 16px',
+               backgroundColor: user.verificationStatus === 'rejected' ? '#ccc' : '#d32f2f',
+               color: 'white',
+               border: 'none',
+               borderRadius: 6,
+               cursor: user.verificationStatus === 'rejected' ? 'not-allowed' : 'pointer',
+               fontSize: 12,
+               fontWeight: 'bold'
+             }}
+           >
+             ❌ Reject KYC
+           </button>
+           <button 
+             onClick={() => sendKYCNotification(user._id)}
+             style={{ 
+               padding: '8px 16px',
+               backgroundColor: '#1976d2',
+               color: 'white',
+               border: 'none',
+               borderRadius: 6,
+               cursor: 'pointer',
+               fontSize: 12
+             }}
+           >
+             📧 Send Message
+           </button>
+           <button 
+             onClick={() => closeUserModal()}
+             style={{ 
+               padding: '8px 16px',
+               backgroundColor: '#666',
+               color: 'white',
+               border: 'none',
+               borderRadius: 6,
+               cursor: 'pointer',
+               fontSize: 12
+             }}
+           >
+             Close
           </button>
         </div>
       </div>
@@ -933,15 +940,21 @@ export default function AdminKYC() {
       {/* Image Modal */}
       <AdminModal open={!!modalImage} onClose={() => setModalImage(null)} title="Document Image">
         {modalImage && (
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ 
+            textAlign: 'center',
+            maxHeight: '60vh',
+            overflow: 'auto',
+            padding: '10px'
+          }}>
             <img 
               src={modalImage} 
               alt="Document" 
               style={{ 
                 maxWidth: '100%', 
-                maxHeight: '70vh',
+                maxHeight: '50vh',
                 border: '1px solid #ddd',
-                borderRadius: 4
+                borderRadius: 4,
+                objectFit: 'contain'
               }}
             />
           </div>

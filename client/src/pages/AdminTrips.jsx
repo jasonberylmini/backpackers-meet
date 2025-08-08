@@ -948,15 +948,21 @@ export default function AdminTrips() {
       {/* Image Modal */}
       <AdminModal open={!!modalImage} onClose={() => setModalImage(null)} title="Trip Image">
         {modalImage && (
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ 
+            textAlign: 'center',
+            maxHeight: '60vh',
+            overflow: 'auto',
+            padding: '10px'
+          }}>
             <img 
               src={modalImage} 
               alt="Trip" 
               style={{ 
                 maxWidth: '100%', 
-                maxHeight: '70vh',
+                maxHeight: '50vh',
                 border: '1px solid #ddd',
-                borderRadius: 4
+                borderRadius: 4,
+                objectFit: 'contain'
               }}
             />
           </div>

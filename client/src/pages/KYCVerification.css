@@ -504,61 +504,299 @@
   transform: translateY(-1px);
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .header-content {
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
+/* Enhanced responsive design for KYCVerification */
+@media (max-width: 1200px) {
+  .kyc-container {
+    max-width: 900px;
+    padding: 2rem;
   }
+  
+  .kyc-form {
+    padding: 1.5rem;
+  }
+}
 
-  .header-text h1 {
+@media (max-width: 1024px) {
+  .kyc-container {
+    max-width: 100%;
+    padding: 1.5rem;
+  }
+  
+  .kyc-header {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .kyc-title {
     font-size: 1.75rem;
   }
-
-  .upload-card {
-    padding: 20px;
+  
+  .kyc-subtitle {
+    font-size: 0.95rem;
   }
+  
+  .kyc-form {
+    padding: 1.25rem;
+  }
+  
+  .form-section {
+    padding: 1.25rem;
+  }
+  
+  .form-section h3 {
+    font-size: 1.1rem;
+  }
+  
+  .form-group {
+    margin-bottom: 1rem;
+  }
+  
+  .form-group label {
+    font-size: 0.9rem;
+  }
+  
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 0.75rem;
+    font-size: 0.9rem;
+  }
+  
+  .upload-area {
+    padding: 1.5rem;
+  }
+  
+  .upload-text {
+    font-size: 0.9rem;
+  }
+  
+  .upload-hint {
+    font-size: 0.8rem;
+  }
+}
 
+@media (max-width: 768px) {
+  .kyc-container {
+    padding: 1rem;
+  }
+  
+  .kyc-header {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+  
+  .kyc-title {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .kyc-subtitle {
+    font-size: 0.9rem;
+  }
+  
+  .kyc-form {
+    padding: 1rem;
+  }
+  
+  .form-section {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .form-section h3 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .form-group {
+    margin-bottom: 0.875rem;
+  }
+  
+  .form-group label {
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 0.7rem;
+    font-size: 0.85rem;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+  
+  .form-row .form-group {
+    flex: 1;
+  }
+  
+  .upload-area {
+    padding: 1.25rem;
+  }
+  
+  .upload-text {
+    font-size: 0.85rem;
+  }
+  
+  .upload-hint {
+    font-size: 0.75rem;
+  }
+  
+  .upload-preview {
+    margin-top: 1rem;
+  }
+  
+  .upload-preview img {
+    max-width: 100%;
+    height: auto;
+  }
+  
   .form-actions {
     flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
   }
-
-  .form-actions button {
+  
+  .form-actions .btn {
     width: 100%;
+    justify-content: center;
   }
-
-  .pending-card,
-  .success-card,
-  .rejected-card {
-    padding: 24px;
+  
+  .btn-primary {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+  }
+  
+  .btn-secondary {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+  }
+  
+  .kyc-status {
+    padding: 1rem;
+  }
+  
+  .status-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 2rem;
+  }
+  
+  .status-title {
+    font-size: 1.25rem;
+  }
+  
+  .status-description {
+    font-size: 0.9rem;
   }
 }
 
 @media (max-width: 480px) {
-  .kyc-content {
-    padding: 0 16px;
+  .kyc-container {
+    padding: 0.5rem;
   }
-
-  .header-text h1 {
+  
+  .kyc-header {
+    padding: 0.875rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .kyc-title {
+    font-size: 1.25rem;
+  }
+  
+  .kyc-subtitle {
+    font-size: 0.85rem;
+  }
+  
+  .kyc-form {
+    padding: 0.875rem;
+  }
+  
+  .form-section {
+    padding: 0.875rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .form-section h3 {
+    font-size: 0.95rem;
+  }
+  
+  .form-group {
+    margin-bottom: 0.75rem;
+  }
+  
+  .form-group label {
+    font-size: 0.8rem;
+  }
+  
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 0.6rem;
+    font-size: 0.8rem;
+  }
+  
+  .form-row {
+    gap: 0.75rem;
+  }
+  
+  .upload-area {
+    padding: 1rem;
+  }
+  
+  .upload-text {
+    font-size: 0.8rem;
+  }
+  
+  .upload-hint {
+    font-size: 0.7rem;
+  }
+  
+  .form-actions {
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  
+  .btn-primary,
+  .btn-secondary {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.95rem;
+  }
+  
+  .kyc-status {
+    padding: 0.875rem;
+  }
+  
+  .status-icon {
+    width: 50px;
+    height: 50px;
     font-size: 1.5rem;
   }
-
-  .upload-card {
-    padding: 16px;
+  
+  .status-title {
+    font-size: 1.1rem;
   }
-
-  .upload-placeholder {
-    padding: 30px 16px;
+  
+  .status-description {
+    font-size: 0.85rem;
   }
-
-  .upload-icon-large {
-    font-size: 2rem;
+  
+  .progress-bar {
+    height: 4px;
   }
-
-  .pending-card,
-  .success-card,
-  .rejected-card {
-    padding: 20px;
+  
+  .progress-step {
+    width: 30px;
+    height: 30px;
+    font-size: 0.8rem;
+  }
+  
+  .progress-label {
+    font-size: 0.7rem;
   }
 } 

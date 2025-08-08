@@ -41,6 +41,7 @@ const flagSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  details: { type: String, default: '' }, // Add details field
   status: {
     type: String,
     enum: ['open', 'dismissed', 'resolved'],
@@ -51,6 +52,12 @@ const flagSchema = new mongoose.Schema({
   resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   resolvedAt: { type: Date },
   actionTaken: { type: String, default: '' },
+  // Add fields that admin controller expects
+  resolved: { type: Boolean, default: false },
+  dismissed: { type: Boolean, default: false },
+  escalated: { type: Boolean, default: false },
+  escalatedAt: { type: Date },
+  dismissedAt: { type: Date },
   history: [{
     status: String,
     changedAt: Date,
