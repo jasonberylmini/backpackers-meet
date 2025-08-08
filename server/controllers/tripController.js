@@ -2,6 +2,7 @@ import Trip from '../models/Trip.js';
 import User from '../models/User.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
+import { autoAddFriendsFromTrip } from './userController.js';
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()]
@@ -330,6 +331,15 @@ export const markTripAsCompleted = async (req, res) => {
 
     logger.info(`Trip ${tripId} marked as completed by user ${userId}`);
 
+    // Auto-add friends between all trip participants
+    try {
+      await autoAddFriendsFromTrip(tripId);
+      logger.info(`Auto-added friends for completed trip: ${trip.destination}`);
+    } catch (error) {
+      logger.error('Failed to auto-add friends for completed trip:', error);
+      // Don't fail the trip completion if friend addition fails
+    }
+
     res.status(200).json({ 
       message: 'Trip marked as completed successfully',
       trip: {
@@ -359,10 +369,20 @@ export const autoCompleteExpiredTrips = async () => {
       return;
     }
 
-    const updatePromises = expiredTrips.map(trip => {
+    const updatePromises = expiredTrips.map(async (trip) => {
       trip.status = 'completed';
       trip.moderation.completedAt = new Date();
-      return trip.save();
+      await trip.save();
+      
+      // Auto-add friends between all trip participants
+      try {
+        await autoAddFriendsFromTrip(trip._id);
+        logger.info(`Auto-added friends for auto-completed trip: ${trip.destination}`);
+      } catch (error) {
+        logger.error('Failed to auto-add friends for auto-completed trip:', error);
+      }
+      
+      return trip;
     });
 
     await Promise.all(updatePromises);

@@ -2,6 +2,17 @@
 .expenses-container {
   min-height: 100vh;
   background-color: #f8fafc;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  width: 100%;
+}
+
+/* Ensure all main containers don't cause horizontal overflow */
+* {
+  box-sizing: border-box;
+}
+
+.expenses-container * {
+  max-width: 100%;
 }
 
 .loading-state {
@@ -334,40 +345,127 @@
   gap: 8px;
 }
 
-  .edit-btn, .delete-btn, .settlement-btn {
-  padding: 6px 12px;
+.expenses-container .edit-btn, 
+.expenses-container .delete-btn, 
+.expenses-container .settlement-btn {
+  padding: 8px 12px !important;
   border: none;
-    border-radius: 6px;
-  font-size: 0.8rem;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
+  border-radius: 8px !important;
+  font-size: 0.875rem !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  width: auto !important;
+  box-sizing: border-box;
+  text-decoration: none;
+  gap: 6px;
+  min-width: 80px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
   .settlement-btn {
-  background: #dbeafe;
-  color: #1e40af;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #dcfce7;
 }
 
   .settlement-btn:hover {
-  background: #bfdbfe;
+  background: #dcfce7;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(21, 128, 61, 0.2);
   }
 
 .edit-btn {
-  background: #f3f4f6;
-  color: #374151;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
 }
 
 .edit-btn:hover {
-  background: #e5e7eb;
+  background: #bae6fd;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(3, 105, 161, 0.2);
 }
 
-.delete-btn {
+/* Unique delete button styles for expenses page */
+.expense-delete-button {
   background: #fef2f2;
   color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 70px;
+  height: 32px;
+  box-sizing: border-box;
+  text-decoration: none;
+  outline: none;
+  white-space: nowrap;
+  line-height: 1;
 }
 
-.delete-btn:hover {
+.expense-delete-button:hover {
   background: #fee2e2;
+  border-color: #fca5a5;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+.expense-delete-button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(239, 68, 68, 0.2);
+}
+
+/* Reset and override all button styles for delete button - DEPRECATED */
+.expenses-container .expense-item .expense-actions .delete-btn,
+.expenses-container .delete-btn {
+  all: unset !important;
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+  min-width: 70px !important;
+  max-width: 100px !important;
+  height: 36px !important;
+  width: auto !important;
+  border-radius: 8px !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  font-family: inherit !important;
+  padding: 8px 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  box-sizing: border-box !important;
+  line-height: 1 !important;
+  gap: 4px !important;
+  position: relative !important;
+  text-decoration: none !important;
+  outline: none !important;
+}
+
+.expenses-container .expense-item .expense-actions .delete-btn:hover,
+.expenses-container .delete-btn:hover {
+  background: #fee2e2 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2) !important;
+  border-color: #f87171 !important;
 }
 
 /* Trip Navigation Styles */
@@ -380,6 +478,13 @@
   gap: 0.5rem;
   overflow-x: auto;
   padding-bottom: 0.5rem;
+  flex-wrap: wrap; /* Allow tabs to wrap to next line */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.trip-tabs::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
 }
 
 .trip-tab {
@@ -1077,7 +1182,39 @@
   .stats-grid {
     grid-template-columns: 1fr;
   }
-
+  
+  /* Make container full width on mobile */
+  .welcome-content,
+  .dashboard-stats,
+  .expenses-filters,
+  .expenses-list {
+    max-width: 100%;
+    padding: 0 15px;
+  }
+  
+  /* Stack buttons vertically on very small screens */
+  .expense-actions {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .edit-btn, .delete-btn, .settlement-btn {
+    min-width: 100%;
+    height: 36px;
+    font-size: 0.8rem;
+    padding: 8px 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* Make trip tabs more mobile friendly */
+  .trip-tab {
+    flex: none;
+    min-width: 120px;
+    white-space: nowrap;
+  }
+  
   .form-row {
     grid-template-columns: 1fr;
   }

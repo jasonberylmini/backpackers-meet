@@ -234,6 +234,7 @@
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin-top: 0.25rem;
+  white-space: pre;
 }
 
 /* Profile Actions */
@@ -755,6 +756,35 @@
 
 .friend-instagram {
   margin-top: 0.25rem;
+}
+
+.friend-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.friend-actions .btn-small {
+  font-size: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.friend-actions .btn-danger {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.friend-actions .btn-danger:hover {
+  background: #fef2f2;
+  border-color: #f87171;
+  transform: translateY(-1px);
 }
 
 /* Empty States */

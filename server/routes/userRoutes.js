@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser, getProfile, updateProfile, getUnverifiedUsers, verifyUser, forgotPassword, resetPassword, validateResetToken, setUserStatus, getUserById, blockUser, unblockUser, getBlockedUsers, getDashboardStats, getDashboardTrips, getUserFriends } from '../controllers/userController.js';
+import { registerUser, loginUser, getProfile, updateProfile, getUnverifiedUsers, verifyUser, forgotPassword, resetPassword, validateResetToken, setUserStatus, getUserById, blockUser, unblockUser, getBlockedUsers, getDashboardStats, getDashboardTrips, getUserFriends, addFriend, removeFriend } from '../controllers/userController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 import isAdmin from '../middlewares/isAdmin.js';
 import upload from '../middlewares/upload.js';
@@ -90,5 +90,7 @@ router.get('/blocked/list', verifyToken, getBlockedUsers);
 
 // User friends
 router.get('/:userId/friends', verifyToken, getUserFriends);
+router.post('/:friendId/add-friend', verifyToken, addFriend);
+router.delete('/:friendId/remove-friend', verifyToken, removeFriend);
 
 export default router;

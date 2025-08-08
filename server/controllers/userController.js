@@ -589,3 +589,117 @@ export const getUserFriends = async (req, res) => {
   }
 };
 
+// Add friend (automatic when trip completes)
+export const addFriend = async (req, res) => {
+  try {
+    const { friendId } = req.params;
+    const currentUserId = req.user.userId;
+    
+    if (currentUserId === friendId) {
+      return res.status(400).json({ message: 'You cannot add yourself as a friend' });
+    }
+    
+    const [currentUser, friendUser] = await Promise.all([
+      User.findById(currentUserId),
+      User.findById(friendId)
+    ]);
+    
+    if (!friendUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Check if already friends
+    if (currentUser.friends.includes(friendId)) {
+      return res.status(400).json({ message: 'Already friends' });
+    }
+    
+    // Add friend to both users
+    await Promise.all([
+      User.findByIdAndUpdate(currentUserId, { $push: { friends: friendId } }),
+      User.findByIdAndUpdate(friendId, { $push: { friends: currentUserId } })
+    ]);
+    
+    res.status(200).json({ message: 'Friend added successfully' });
+  } catch (error) {
+    logger.error('Add Friend Error:', error);
+    res.status(500).json({ message: 'Failed to add friend' });
+  }
+};
+
+// Remove friend (manual removal)
+export const removeFriend = async (req, res) => {
+  try {
+    const { friendId } = req.params;
+    const currentUserId = req.user.userId;
+    
+    if (currentUserId === friendId) {
+      return res.status(400).json({ message: 'Invalid operation' });
+    }
+    
+    const [currentUser, friendUser] = await Promise.all([
+      User.findById(currentUserId),
+      User.findById(friendId)
+    ]);
+    
+    if (!friendUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Check if they are friends
+    if (!currentUser.friends.includes(friendId)) {
+      return res.status(400).json({ message: 'Not friends' });
+    }
+    
+    // Remove friend from both users
+    await Promise.all([
+      User.findByIdAndUpdate(currentUserId, { $pull: { friends: friendId } }),
+      User.findByIdAndUpdate(friendId, { $pull: { friends: currentUserId } })
+    ]);
+    
+    res.status(200).json({ message: 'Friend removed successfully' });
+  } catch (error) {
+    logger.error('Remove Friend Error:', error);
+    res.status(500).json({ message: 'Failed to remove friend' });
+  }
+};
+
+// Auto-add friends when trip completes (called internally)
+export const autoAddFriendsFromTrip = async (tripId) => {
+  try {
+    const Trip = (await import('../models/Trip.js')).default;
+    const trip = await Trip.findById(tripId).populate('creator members');
+    
+    if (!trip) {
+      logger.warn(`Trip ${tripId} not found for auto friend addition`);
+      return;
+    }
+    
+    // Get all participants (creator + members)
+    const allParticipants = [trip.creator._id, ...trip.members.map(m => m._id)];
+    
+    // Create friend connections between all participants
+    const friendAddPromises = [];
+    
+    for (let i = 0; i < allParticipants.length; i++) {
+      for (let j = i + 1; j < allParticipants.length; j++) {
+        const user1 = allParticipants[i];
+        const user2 = allParticipants[j];
+        
+        // Check if they're already friends
+        const user1Data = await User.findById(user1);
+        if (!user1Data.friends.includes(user2)) {
+          friendAddPromises.push(
+            User.findByIdAndUpdate(user1, { $addToSet: { friends: user2 } }),
+            User.findByIdAndUpdate(user2, { $addToSet: { friends: user1 } })
+          );
+        }
+      }
+    }
+    
+    await Promise.all(friendAddPromises);
+    logger.info(`Auto-added friends for completed trip: ${trip.destination} (${allParticipants.length} participants)`);
+  } catch (error) {
+    logger.error('Auto Add Friends Error:', error);
+  }
+};
+

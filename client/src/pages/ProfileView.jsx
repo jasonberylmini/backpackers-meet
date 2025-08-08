@@ -212,6 +212,26 @@ export default function ProfileView() {
     navigate(`/profile/${friendId}`);
   };
 
+  const handleRemoveFriend = async (friendId) => {
+    if (!window.confirm('Are you sure you want to remove this friend?')) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.delete(`/api/users/${friendId}/remove-friend`, { headers });
+      
+      // Remove friend from local state
+      setFriends(friends.filter(friend => friend._id !== friendId));
+      toast.success('Friend removed successfully!');
+    } catch (error) {
+      console.error('Failed to remove friend:', error);
+      toast.error(error.response?.data?.message || 'Failed to remove friend');
+    }
+  };
+
   if (loading) {
     return (
       <div className="modern-profile-container">
@@ -312,16 +332,16 @@ export default function ProfileView() {
             <div className="profile-stats">
               <div className="stat-card">
                 <span className="stat-number">{trips.length}</span>
-                <span className="stat-label">TRIPS</span>
+                <span className="stat-label">&nbsp;TRIPS</span>
               </div>
               <div className="stat-card">
                 <span className="stat-number">{posts.length}</span>
-                <span className="stat-label">POSTS</span>
+                <span className="stat-label">&nbsp;POSTS</span>
               </div>
               {isOwnProfile && (
                 <div className="stat-card">
                   <span className="stat-number">{friends.length}</span>
-                  <span className="stat-label">FRIENDS</span>
+                  <span className="stat-label">&nbsp;FRIENDS</span>
                 </div>
               )}
             </div>
@@ -610,12 +630,21 @@ export default function ProfileView() {
                            </p>
                          )}
                        </div>
-                      <button 
-                        className="btn-primary btn-small"
-                        onClick={() => handleViewFriendProfile(friend._id)}
-                      >
-                        View Profile
-                      </button>
+                      <div className="friend-actions">
+                        <button 
+                          className="btn-primary btn-small"
+                          onClick={() => handleViewFriendProfile(friend._id)}
+                        >
+                          View Profile
+                        </button>
+                        <button 
+                          className="btn-danger btn-small"
+                          onClick={() => handleRemoveFriend(friend._id)}
+                          title="Remove friend"
+                        >
+                          ✕ Remove
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

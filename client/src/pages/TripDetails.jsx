@@ -7,6 +7,8 @@ import { getProfileImageUrl, getDisplayFirstChar } from '../utils/userDisplay';
 import { isTripCompleted } from '../utils/tripStatus';
 import ReviewsList from '../components/ReviewsList';
 import ReviewForm from '../components/ReviewForm';
+import ExpenseForm from '../components/ExpenseForm';
+import ExpenseList from '../components/ExpenseList';
 import './TripDetails.css';
 
 export default function TripDetails() {
@@ -40,6 +42,7 @@ export default function TripDetails() {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [editingReview, setEditingReview] = useState(null);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -645,21 +648,140 @@ export default function TripDetails() {
         {activeTab === 'expenses' && (
           <section className="expenses-section">
             <div className="expenses-container">
-              <div className="expenses-header">
-                <h3>Trip Expenses</h3>
-                <button className="add-expense-btn">
-                  + Add Expense
-                </button>
-            </div>
-
-              <div className="expenses-placeholder">
-                <div className="placeholder-icon">💰</div>
-                <h4>No expenses yet</h4>
-                <p>Start tracking your trip expenses to keep everyone informed about costs.</p>
-                <button className="primary-btn-modern">
-                  Add First Expense
-                </button>
-              </div>
+              {!isMember ? (
+                <div className="expenses-access-denied">
+                  <div className="access-denied-icon">🔒</div>
+                  <h3>Access Restricted</h3>
+                  <p>You need to be a member of this trip to view and manage expenses.</p>
+                  <button 
+                    className="primary-btn-modern"
+                    onClick={() => setActiveTab('overview')}
+                  >
+                    Back to Trip Details
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="expenses-header">
+                    <h3>Trip Expenses</h3>
+                    {!isTripCompleted(trip) ? (
+                      <button 
+                        className="add-expense-btn"
+                        onClick={() => {
+                          console.log('Add Expense button clicked');
+                          console.log('Setting showExpenseForm to true');
+                          setShowExpenseForm(true);
+                        }}
+                      >
+                        + Add Expense
+                      </button>
+                    ) : (
+                      <div className="completed-trip-notice">
+                        <span className="notice-icon">🔒</span>
+                        <span className="notice-text">Trip completed - expenses locked</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <ExpenseList 
+                    key={`expense-list-${tripId}`}
+                    tripId={tripId} 
+                    currentUser={user}
+                    onExpenseUpdated={() => {
+                      // Refresh expense list
+                      console.log('Expense updated, refreshing list');
+                    }}
+                  />
+                  
+                  {showExpenseForm && (
+                    <div 
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        width: '100vw',
+                        height: '100vh',
+                        background: 'rgba(0, 0, 0, 0.8)', // Dark overlay
+                        zIndex: 999999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'auto'
+                      }}
+                      onClick={(e) => {
+                        console.log('Overlay clicked');
+                        if (e.target === e.currentTarget) {
+                          setShowExpenseForm(false);
+                        }
+                      }}
+                    >
+                      <div 
+                        style={{
+                          background: 'white', 
+                          border: 'none',
+                          borderRadius: '15px', 
+                          maxWidth: '600px', 
+                          width: '90%',
+                          minHeight: '400px',
+                          maxHeight: '80vh',
+                          overflow: 'auto',
+                          boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+                          position: 'relative',
+                          margin: '20px',
+                          padding: '20px',
+                          scrollbarWidth: 'none', /* Firefox */
+                          msOverflowStyle: 'none', /* Internet Explorer 10+ */
+                        }}
+                        className="expense-modal-content"
+                        onClick={(e) => {
+                          console.log('Modal content clicked');
+                          e.stopPropagation();
+                        }}
+                      >
+                        <button 
+                          onClick={() => {
+                            console.log('Close button clicked');
+                            setShowExpenseForm(false);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '15px',
+                            right: '15px',
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '24px',
+                            cursor: 'pointer',
+                            color: '#666',
+                            zIndex: 1000,
+                            width: '30px',
+                            height: '30px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          title="Close"
+                        >
+                          ×
+                        </button>
+                        
+                        <ExpenseForm
+                          tripId={tripId}
+                          currentUser={user}
+                          onExpenseAdded={(expense) => {
+                            setShowExpenseForm(false);
+                            toast.success('Expense added successfully!');
+                            // Force a refresh of the expense list
+                            console.log('Expense added, should refresh list');
+                          }}
+                          onCancel={() => setShowExpenseForm(false)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </section>
         )}

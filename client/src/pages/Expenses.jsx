@@ -712,12 +712,12 @@ export default function Expenses() {
                          >
                            ✏️ Edit
                          </button>
-                         <button 
-                           className="delete-btn"
-                           onClick={() => handleDeleteExpense(expense._id)}
-                         >
-                           🗑️ Delete
-                         </button>
+                                                 <button 
+                          className="expense-delete-button"
+                          onClick={() => handleDeleteExpense(expense._id)}
+                        >
+                          🗑️ Delete
+                        </button>
                        </div>
                      </div>
                    ))}

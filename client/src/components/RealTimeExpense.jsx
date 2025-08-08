@@ -12,6 +12,32 @@ const RealTimeExpense = ({ tripId, currentUser }) => {
     currency: 'USD'
   });
 
+  // Fetch existing expenses when component mounts
+  useEffect(() => {
+    const fetchExpenses = async () => {
+      try {
+        const response = await fetch(`/api/expenses/trip/${tripId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setExpenses(data.expenses || []);
+        } else {
+          console.error('Failed to fetch expenses');
+        }
+      } catch (error) {
+        console.error('Error fetching expenses:', error);
+      }
+    };
+
+    if (tripId) {
+      fetchExpenses();
+    }
+  }, [tripId]);
+
   useEffect(() => {
     if (!socket) return;
 
@@ -125,12 +151,13 @@ const RealTimeExpense = ({ tripId, currentUser }) => {
       borderRadius: '12px',
       backgroundColor: '#ffffff',
       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      maxWidth: '600px',
-      margin: '20px auto',
-      padding: '20px'
+      width: '100%',
+      maxWidth: '800px',
+      margin: '0 auto',
+      padding: '24px'
     }}>
       <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50' }}>
-        💰 Real-Time Expenses
+        💰 Trip Expenses
         {isConnected && <span style={{ color: '#28a745', fontSize: '14px', marginLeft: '10px' }}>🟢 Live</span>}
       </h2>
 
