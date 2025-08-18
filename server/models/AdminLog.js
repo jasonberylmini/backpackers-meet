@@ -2,13 +2,15 @@
 import mongoose from 'mongoose';
 
 const adminLogSchema = new mongoose.Schema({
-  adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  actor: { type: String, enum: ['admin', 'ai'], default: 'admin' },
   action: { type: String, required: true },
   targetUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   targetTripId: { type: mongoose.Schema.Types.ObjectId, ref: 'Trip' },
   targetReviewId: { type: mongoose.Schema.Types.ObjectId, ref: 'Review' },
   targetFlagId: { type: mongoose.Schema.Types.ObjectId, ref: 'Flag' },
   reason: { type: String },
+  metadata: { type: Object, default: {} },
   outcome: { type: String, default: '' },
   updatedAt: { type: Date, default: Date.now },
   timestamp: { type: Date, default: Date.now },

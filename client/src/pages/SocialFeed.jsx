@@ -299,6 +299,53 @@ export default function SocialFeed() {
     }
   };
 
+  const handleEditPost = async (post) => {
+    const initial = post.content || '';
+    const edited = prompt('Edit your post:', initial);
+    if (edited === null) {
+      setShowPostMenu(prev => ({ ...prev, [post._id]: false }));
+      return;
+    }
+    const content = edited.trim();
+    if (!content) {
+      toast.error('Post cannot be empty');
+      return;
+    }
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      const payload = { content, audience: post.audience };
+      const res = await axios.put(`/api/posts/${post._id}`, payload, { headers });
+      const updated = res.data?.post || { ...post, content };
+      setPosts(prev => prev.map(p => (p._id === post._id ? { ...p, ...updated } : p)));
+      toast.success('Post updated');
+    } catch (error) {
+      console.error('Failed to edit post:', error);
+      toast.error(error.response?.data?.message || 'Failed to edit post');
+    } finally {
+      setShowPostMenu(prev => ({ ...prev, [post._id]: false }));
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm('Delete this post?')) {
+      setShowPostMenu(prev => ({ ...prev, [postId]: false }));
+      return;
+    }
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.delete(`/api/posts/${postId}`, { headers });
+      setPosts(prev => prev.filter(p => p._id !== postId));
+      toast.success('Post deleted');
+    } catch (error) {
+      console.error('Failed to delete post:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete post');
+    } finally {
+      setShowPostMenu(prev => ({ ...prev, [postId]: false }));
+    }
+  };
+
   const handleBlockUser = async (userId, userName) => {
     if (!window.confirm(`Are you sure you want to block ${userName}?`)) return;
     
@@ -497,22 +544,14 @@ export default function SocialFeed() {
                           <>
                             <button 
                               className="menu-item"
-                              onClick={() => {
-                                toast.info('Edit post feature coming soon!');
-                                setShowPostMenu(prev => ({ ...prev, [post._id]: false }));
-                              }}
+                              onClick={() => handleEditPost(post)}
                             >
                               <i className="icon-edit"></i>
                               Edit Post
                             </button>
                             <button 
                               className="menu-item danger"
-                              onClick={() => {
-                                if (window.confirm('Are you sure you want to delete this post?')) {
-                                  toast.info('Delete post feature coming soon!');
-                                }
-                                setShowPostMenu(prev => ({ ...prev, [post._id]: false }));
-                              }}
+                              onClick={() => handleDeletePost(post._id)}
                             >
                               <i className="icon-delete"></i>
                               Delete Post

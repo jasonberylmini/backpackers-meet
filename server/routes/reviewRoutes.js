@@ -2,11 +2,12 @@ import express from 'express';
 import { giveReview, updateReview, getUserReviews, getTripReviews, deleteReview, getAllReviews, flagReview, unflagReview, getReviewsForModeration, checkReviewPermissions } from '../controllers/reviewController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 import isAdmin from '../middlewares/isAdmin.js';
+import { moderateBodyField } from '../middlewares/moderation.js';
 
 const router = express.Router();
 
-router.post('/submit', verifyToken, giveReview);
-router.put('/:reviewId', verifyToken, updateReview);
+router.post('/submit', verifyToken, moderateBodyField('feedback'), giveReview);
+router.put('/:reviewId', verifyToken, moderateBodyField('feedback'), updateReview);
 router.get('/permissions', verifyToken, checkReviewPermissions);
 router.get('/trip/:tripId', verifyToken, getTripReviews);
 router.get('/user/:userId', verifyToken, getUserReviews);

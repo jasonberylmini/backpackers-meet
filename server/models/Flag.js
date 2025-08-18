@@ -30,7 +30,7 @@ const flagSchema = new mongoose.Schema({
   },
   flagType: {
     type: String,
-    enum: ['user', 'trip', 'review', 'post'], // 'post' must be included
+    enum: ['user', 'trip', 'review', 'post', 'comment', 'message'], // expanded for moderation
     required: true
   },
   targetId: {

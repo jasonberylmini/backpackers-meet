@@ -2,6 +2,7 @@ import Review from '../models/Review.js';
 import Trip from '../models/Trip.js';
 import User from '../models/User.js';
 import Flag from '../models/Flag.js';
+import { maybeCreateAutoFlag } from '../middlewares/moderation.js';
 
 // Helper: Check if user is a participant in the trip
 async function isTripParticipant(tripId, userId) {
@@ -74,63 +75,7 @@ async function getTripDetails(tripId) {
   return trip;
 }
 
-// Automated review moderation checks
-function runAutomatedChecks(feedback, rating) {
-  const issues = [];
-  
-  // Check for banned words/phrases
-  const bannedWords = [
-    'scam', 'fake', 'fraud', 'cheat', 'liar', 'stupid', 'idiot', 'moron',
-    'hate', 'kill', 'death', 'suicide', 'terrorist', 'bomb', 'weapon',
-    'spam', 'advertisement', 'promote', 'buy now', 'click here'
-  ];
-  
-  const lowerFeedback = feedback.toLowerCase();
-  for (const word of bannedWords) {
-    if (lowerFeedback.includes(word)) {
-      issues.push(`Contains banned word: ${word}`);
-    }
-  }
-  
-  // Check for excessive caps (shouting)
-  const capsCount = (feedback.match(/[A-Z]/g) || []).length;
-  const totalChars = feedback.length;
-  if (capsCount > 0 && (capsCount / totalChars) > 0.7) {
-    issues.push('Excessive use of capital letters');
-  }
-  
-  // Check for repeated characters (spam)
-  const repeatedChars = feedback.match(/(.)\1{4,}/g);
-  if (repeatedChars) {
-    issues.push('Repeated characters detected');
-  }
-  
-  // Check for suspicious rating patterns
-  if (rating < 1 || rating > 5) {
-    issues.push('Invalid rating value');
-  }
-  
-  // Check for minimum content length
-  if (feedback.length < 10) {
-    issues.push('Review too short (minimum 10 characters)');
-  }
-  
-  // Check for maximum content length
-  if (feedback.length > 1000) {
-    issues.push('Review too long (maximum 1000 characters)');
-  }
-  
-  // Check for URLs/links
-  const urlPattern = /https?:\/\/[^\s]+/g;
-  if (urlPattern.test(feedback)) {
-    issues.push('URLs/links not allowed');
-  }
-  
-  return {
-    passed: issues.length === 0,
-    issues
-  };
-}
+// Perspective-only moderation: middleware blocks high-risk content before reaching here.
 
 // Submit a review (for trip or user)
 export const giveReview = async (req, res) => {
@@ -212,15 +157,9 @@ export const giveReview = async (req, res) => {
       });
     }
 
-    // Run automated moderation checks
-    const moderationResult = runAutomatedChecks(feedback, rating);
+    // Perspective middleware already blocked high-risk. Default approve.
     let status = 'approved';
     let adminResponse = '';
-
-    if (!moderationResult.passed) {
-      status = 'rejected';
-      adminResponse = `Auto-rejected: ${moderationResult.issues.join(', ')}`;
-    }
 
     const newReview = new Review({
       reviewer,
@@ -234,6 +173,12 @@ export const giveReview = async (req, res) => {
       adminResponse
     });
     await newReview.save();
+    // If the request-level moderation flagged the content, create a flag and mark review flagged
+    const reqMod = req?.moderation?.feedback;
+    if (reqMod && reqMod.flagged) {
+      await Review.findByIdAndUpdate(newReview._id, { flagged: true });
+      await maybeCreateAutoFlag({ req, fieldName: 'feedback', targetId: newReview._id, flagType: 'review' });
+    }
     
     // If this is a user review and it's approved, automatically add as friends
     if (reviewType === 'user' && reviewedUser && status === 'approved') {
@@ -253,9 +198,7 @@ export const giveReview = async (req, res) => {
       }
     }
     
-    const responseMessage = status === 'approved' 
-      ? 'Review submitted and published.' 
-      : 'Review submitted but rejected due to content policy violations.';
+    const responseMessage = 'Review submitted and published.';
     
     // Populate the reviewer data before sending response
     const populatedReview = await Review.findById(newReview._id)
@@ -265,7 +208,7 @@ export const giveReview = async (req, res) => {
       message: responseMessage, 
       review: {
         ...populatedReview.toObject(),
-        moderationIssues: moderationResult.passed ? null : moderationResult.issues
+        moderationIssues: req?.moderation?.feedback?.flagged ? req.moderation.feedback.reasons : null
       }
     });
   } catch (err) {
@@ -506,15 +449,9 @@ export const updateReview = async (req, res) => {
       return res.status(403).json({ message: 'You can only update your own reviews.' });
     }
 
-    // Run automated moderation checks
-    const moderationResult = runAutomatedChecks(feedback, rating);
+    // Perspective middleware blocked high-risk; keep approved
     let status = 'approved';
     let adminResponse = '';
-
-    if (!moderationResult.passed) {
-      status = 'rejected';
-      adminResponse = `Auto-rejected: ${moderationResult.issues.join(', ')}`;
-    }
 
     // Update the review
     const updatedReview = await Review.findByIdAndUpdate(
@@ -530,9 +467,13 @@ export const updateReview = async (req, res) => {
       { new: true }
     ).populate('reviewer', 'name email username profileImage');
 
-    const responseMessage = status === 'approved' 
-      ? 'Review updated and published.' 
-      : 'Review updated but rejected due to content policy violations.';
+    const reqModUpdate = req?.moderation?.feedback;
+    if (reqModUpdate && reqModUpdate.flagged) {
+      await Review.findByIdAndUpdate(reviewId, { flagged: true });
+      await maybeCreateAutoFlag({ req, fieldName: 'feedback', targetId: reviewId, flagType: 'review' });
+    }
+
+    const responseMessage = 'Review updated and published.';
     
     res.status(200).json({ 
       message: responseMessage, 

@@ -88,6 +88,7 @@ export default function AdminReports() {
   const [activeTab, setActiveTab] = useState('flag');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [aiOnly, setAiOnly] = useState(true);
   
   // Data states
   const [flagStats, setFlagStats] = useState({});
@@ -138,7 +139,12 @@ export default function AdminReports() {
       if (search) params.search = search;
       
       const flagsRes = await axios.get('/api/admin/flags', { headers, params });
-      setFlags(flagsRes.data.flags);
+      let data = flagsRes.data.flags || [];
+      // Show only items AI couldn't auto-resolve when aiOnly is on
+      if (aiOnly) {
+        data = data.filter(f => f.severity === 'high' || f.escalated || f.reason?.toLowerCase().includes('manual'));
+      }
+      setFlags(data);
     } catch (err) {
       console.error('Failed to fetch flag data:', err);
     }
@@ -201,7 +207,7 @@ export default function AdminReports() {
     }
     
     setLoading(false);
-  }, [activeTab, page, statusFilter, severityFilter, typeFilter, search]);
+  }, [activeTab, page, statusFilter, severityFilter, typeFilter, search, aiOnly]);
 
   // Real-time updates
   useEffect(() => {
@@ -329,6 +335,10 @@ export default function AdminReports() {
       } else if (activeTab === 'user') {
         // For users, we might want to ban instead of delete
         toast.error('Delete action not available for users. Use ban instead.');
+      } else if (activeTab === 'flag') {
+        await axios.post('/api/admin/bulk-flags', { flagIds: [itemId], action: 'delete' }, { headers });
+        toast.success('Flag deleted.');
+        fetchFlagData();
       }
     } catch (err) {
       toast.error('Failed to delete item.');
@@ -416,7 +426,14 @@ export default function AdminReports() {
             width: 32,
             height: 32,
             borderRadius: '50%',
-            backgroundColor: f.flagType === 'user' ? '#007bff' : f.flagType === 'trip' ? '#28a745' : '#ffc107',
+            backgroundColor: (
+              f.flagType === 'user' ? '#007bff' :
+              f.flagType === 'trip' ? '#28a745' :
+              f.flagType === 'review' ? '#ffc107' :
+              f.flagType === 'post' ? '#6f42c1' :
+              f.flagType === 'comment' ? '#17a2b8' :
+              f.flagType === 'message' ? '#fd7e14' : '#6c757d'
+            ),
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -424,7 +441,7 @@ export default function AdminReports() {
             fontSize: 12,
             fontWeight: 'bold'
           }}>
-            {f.flagType === 'user' ? 'U' : f.flagType === 'trip' ? 'T' : 'R'}
+            {f.flagType === 'user' ? 'U' : f.flagType === 'trip' ? 'T' : f.flagType === 'review' ? 'R' : f.flagType === 'post' ? 'P' : f.flagType === 'comment' ? 'C' : 'M'}
           </div>
           <span style={{ textTransform: 'capitalize' }}>{f.flagType}</span>
         </div>
@@ -436,18 +453,27 @@ export default function AdminReports() {
       sortable: true, 
       render: f => {
         let targetName = 'Unknown';
-        let targetEmail = f.flagType;
+        let targetMeta = f.flagType;
         
         if (f.targetId) {
           if (f.flagType === 'user') {
             targetName = f.targetId.name || 'Unknown User';
-            targetEmail = f.targetId.email || 'No email';
+            targetMeta = f.targetId.email || 'No email';
           } else if (f.flagType === 'trip') {
             targetName = f.targetId.destination || 'Unknown Trip';
-            targetEmail = f.targetId.creator?.name || 'Unknown Creator';
+            targetMeta = f.targetId.creator?.name || 'Unknown Creator';
           } else if (f.flagType === 'review') {
             targetName = f.targetId.feedback?.substring(0, 30) || 'Unknown Review';
-            targetEmail = f.targetId.rating ? `${f.targetId.rating}★` : 'No rating';
+            targetMeta = f.targetId.rating ? `${f.targetId.rating}★` : 'No rating';
+          } else if (f.flagType === 'post') {
+            targetName = f.targetId.content?.substring(0, 40) || 'Deleted Post';
+            targetMeta = f.targetId.author?.name || 'Unknown Author';
+          } else if (f.flagType === 'comment') {
+            targetName = f.targetId.content?.substring(0, 40) || 'Deleted Comment';
+            targetMeta = f.targetId.author?.name || 'Unknown Author';
+          } else if (f.flagType === 'message') {
+            targetName = f.targetId.text?.substring(0, 40) || 'Deleted Message';
+            targetMeta = f.targetId.sender?.name || 'Unknown Sender';
           }
         }
         
@@ -457,11 +483,31 @@ export default function AdminReports() {
               {targetName}
             </div>
             <div style={{ fontSize: 12, color: '#6c757d' }}>
-              {targetEmail}
+              {targetMeta}
             </div>
           </div>
         );
       }
+    },
+    { 
+      key: 'ai',
+      label: 'AI Analysis',
+      sortable: false,
+      render: f => (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 260 }}>
+          {(f.reason || '').split(':').pop().split(',').map((tag, idx) => (
+            <span key={idx} style={{
+              background: '#eef2ff',
+              color: '#3f51b5',
+              padding: '2px 6px',
+              borderRadius: 4,
+              fontSize: 11
+            }}>
+              {tag.trim()}
+            </span>
+          ))}
+        </div>
+      )
     },
     { 
       key: 'reason', 
@@ -1448,6 +1494,12 @@ export default function AdminReports() {
         flexWrap: 'wrap',
         alignItems: 'center'
       }}>
+        {activeTab === 'flag' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+            <input type="checkbox" checked={aiOnly} onChange={(e) => setAiOnly(e.target.checked)} />
+            Show only AI-escalated items
+          </label>
+        )}
         <input 
           type="text" 
           placeholder={`Search ${activeTab} reports...`}
@@ -1509,6 +1561,9 @@ export default function AdminReports() {
             <option value="user">User</option>
             <option value="trip">Trip</option>
             <option value="review">Review</option>
+            <option value="post">Post</option>
+            <option value="comment">Comment</option>
+            <option value="message">Message</option>
           </select>
         )}
         <select 

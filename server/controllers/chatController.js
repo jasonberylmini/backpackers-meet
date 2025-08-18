@@ -5,6 +5,8 @@ import User from '../models/User.js';
 import Expense from '../models/Expense.js';
 import Notification from '../models/Notification.js';
 import { sendNotification } from '../utils/sendNotification.js';
+import { maybeCreateAutoFlag } from '../middlewares/moderation.js';
+import AdminLog from '../models/AdminLog.js';
 import winston from 'winston';
 
 const logger = winston.createLogger({
@@ -224,6 +226,17 @@ export const sendMessage = async (req, res) => {
 
     const message = new Message(messageData);
     await message.save();
+    // Auto-flag message content if needed
+    await maybeCreateAutoFlag({ req, fieldName: 'text', targetId: message._id, flagType: 'message' });
+    if (req?.moderation?.text) {
+      await AdminLog.create({
+        actor: 'ai',
+        action: 'message_moderated',
+        reason: req.moderation.text.reasons?.join(', ') || 'approved',
+        outcome: req.moderation.text.aiDecision,
+        metadata: { severity: req.moderation.text.severity },
+      });
+    }
 
     // Populate sender and reply information
     await message.populate('sender', 'username name profileImage');
@@ -434,6 +447,16 @@ export const editMessage = async (req, res) => {
     message.isEdited = true;
     message.editedAt = new Date();
     await message.save();
+    await maybeCreateAutoFlag({ req, fieldName: 'text', targetId: message._id, flagType: 'message' });
+    if (req?.moderation?.text) {
+      await AdminLog.create({
+        actor: 'ai',
+        action: 'message_moderated_update',
+        reason: req.moderation.text.reasons?.join(', ') || 'approved',
+        outcome: req.moderation.text.aiDecision,
+        metadata: { severity: req.moderation.text.severity },
+      });
+    }
 
     // Emit socket event
     const io = req.app.get('io');

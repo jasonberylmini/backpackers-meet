@@ -18,6 +18,7 @@ import {
   getUnreadMessageCount
 } from '../controllers/chatController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
+import { moderateBodyField } from '../middlewares/moderation.js';
 
 const router = express.Router();
 
@@ -77,10 +78,10 @@ router.get('/user-chats', verifyToken, getUserChats);
 router.get('/unread-count', verifyToken, getUnreadMessageCount);
 
 // Message management
-router.post('/:chatId/messages', verifyToken, sendMessage);
+router.post('/:chatId/messages', verifyToken, moderateBodyField('text'), sendMessage);
 router.get('/:chatId/messages', verifyToken, getChatMessages);
 router.patch('/:chatId/messages/read', verifyToken, markMessagesAsRead);
-router.patch('/messages/:messageId', verifyToken, editMessage);
+router.patch('/messages/:messageId', verifyToken, moderateBodyField('text'), editMessage);
 router.delete('/messages/:messageId', verifyToken, deleteMessage);
 router.post('/messages/:messageId/reactions', verifyToken, addMessageReaction);
 

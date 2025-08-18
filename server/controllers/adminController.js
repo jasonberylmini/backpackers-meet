@@ -769,6 +769,27 @@ export const getAllFlags = async (req, res) => {
           feedback: review ? review.feedback : 'Deleted Review',
           rating: review ? review.rating : 0
         };
+      } else if (flag.flagType === 'post') {
+        const Post = (await import('../models/Post.js')).default;
+        const post = await Post.findById(flag.targetId).populate('author', 'name email').select('content author');
+        enhancedFlag.targetId = {
+          content: post ? post.content : 'Deleted Post',
+          author: post?.author ? { name: post.author.name, email: post.author.email } : null
+        };
+      } else if (flag.flagType === 'comment') {
+        const Comment = (await import('../models/Comment.js')).default;
+        const comment = await Comment.findById(flag.targetId).populate('author', 'name email').select('content author');
+        enhancedFlag.targetId = {
+          content: comment ? comment.content : 'Deleted Comment',
+          author: comment?.author ? { name: comment.author.name, email: comment.author.email } : null
+        };
+      } else if (flag.flagType === 'message') {
+        const Message = (await import('../models/Message.js')).default;
+        const message = await Message.findById(flag.targetId).populate('sender', 'name email').select('text sender');
+        enhancedFlag.targetId = {
+          text: message ? message.text : 'Deleted Message',
+          sender: message?.sender ? { name: message.sender.name, email: message.sender.email } : null
+        };
       }
       
       // Ensure flaggedBy has proper data - fix "Anonymous" issue

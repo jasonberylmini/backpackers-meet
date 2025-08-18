@@ -2,6 +2,8 @@ import Post from '../models/Post.js';
 import User from '../models/User.js';
 import Comment from '../models/Comment.js';
 import Flag from '../models/Flag.js';
+import { maybeCreateAutoFlag, evaluateText } from '../middlewares/moderation.js';
+import AdminLog from '../models/AdminLog.js';
 
 export const createPost = async (req, res) => {
   try {
@@ -24,6 +26,12 @@ export const createPost = async (req, res) => {
       return res.status(400).json({ message: 'User country required to create posts.' });
     }
     country = user.country;
+    // Defense-in-depth: re-check moderation even if middleware missed
+    const mod = await evaluateText(content);
+    if (!mod.allowed) {
+      return res.status(400).json({ message: 'Content violates safety policy.', issues: mod.reasons });
+    }
+
     const post = new Post({
       author: req.user.userId,
       content,
@@ -31,6 +39,18 @@ export const createPost = async (req, res) => {
       country
     });
     await post.save();
+    // Auto-flag if moderation suggested issues
+    await maybeCreateAutoFlag({ req, fieldName: 'content', targetId: post._id, flagType: 'post' });
+    // AI action log
+    if (req?.moderation?.content) {
+      await AdminLog.create({
+        actor: 'ai',
+        action: 'post_moderated',
+        reason: req.moderation.content.reasons?.join(', ') || 'approved',
+        outcome: req.moderation.content.aiDecision,
+        metadata: { severity: req.moderation.content.severity },
+      });
+    }
     res.status(201).json({ message: 'Post created!', post });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -47,6 +67,10 @@ export const editPost = async (req, res) => {
       return res.status(403).json({ message: 'You can only edit your own posts.' });
     }
     if (content !== undefined) {
+      const mod = await evaluateText(content);
+      if (!mod.allowed) {
+        return res.status(400).json({ message: 'Content violates safety policy.', issues: mod.reasons });
+      }
       if (!content || content.length > 500) {
         return res.status(400).json({ message: 'Content is required and must be 500 characters or less.' });
       }
@@ -59,6 +83,16 @@ export const editPost = async (req, res) => {
       post.audience = audience;
     }
     await post.save();
+    await maybeCreateAutoFlag({ req, fieldName: 'content', targetId: post._id, flagType: 'post' });
+    if (req?.moderation?.content) {
+      await AdminLog.create({
+        actor: 'ai',
+        action: 'post_moderated_update',
+        reason: req.moderation.content.reasons?.join(', ') || 'approved',
+        outcome: req.moderation.content.aiDecision,
+        metadata: { severity: req.moderation.content.severity },
+      });
+    }
     res.status(200).json({ message: 'Post updated!', post });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -237,6 +271,12 @@ export const addComment = async (req, res) => {
     }
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: 'Post not found.' });
+    // Defense-in-depth moderation
+    const mod = await evaluateText(content);
+    if (!mod.allowed) {
+      return res.status(400).json({ message: 'Content violates safety policy.', issues: mod.reasons });
+    }
+
     const comment = new Comment({
       post: postId,
       author: req.user.userId,
@@ -246,6 +286,16 @@ export const addComment = async (req, res) => {
     post.comments.push(comment._id);
     await post.save();
     await comment.populate('author', 'name profileImage country');
+    await maybeCreateAutoFlag({ req, fieldName: 'content', targetId: comment._id, flagType: 'comment' });
+    if (req?.moderation?.content) {
+      await AdminLog.create({
+        actor: 'ai',
+        action: 'comment_moderated',
+        reason: req.moderation.content.reasons?.join(', ') || 'approved',
+        outcome: req.moderation.content.aiDecision,
+        metadata: { severity: req.moderation.content.severity },
+      });
+    }
     res.status(201).json(comment);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -276,8 +326,22 @@ export const editComment = async (req, res) => {
     if (!content || content.length > 500) {
       return res.status(400).json({ message: 'Content is required and must be 500 characters or less.' });
     }
+    const mod = await evaluateText(content);
+    if (!mod.allowed) {
+      return res.status(400).json({ message: 'Content violates safety policy.', issues: mod.reasons });
+    }
     comment.content = content;
     await comment.save();
+    await maybeCreateAutoFlag({ req, fieldName: 'content', targetId: comment._id, flagType: 'comment' });
+    if (req?.moderation?.content) {
+      await AdminLog.create({
+        actor: 'ai',
+        action: 'comment_moderated_update',
+        reason: req.moderation.content.reasons?.join(', ') || 'approved',
+        outcome: req.moderation.content.aiDecision,
+        metadata: { severity: req.moderation.content.severity },
+      });
+    }
     res.status(200).json({ message: 'Comment updated!', comment });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
