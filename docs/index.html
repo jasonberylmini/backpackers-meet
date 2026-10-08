@@ -90,7 +90,9 @@
   <a class="skip" href="#main">Skip to content</a>
   <header class="nav"><div class="wrap nav-inner">
     <a class="brand" href="#top" aria-label="Backpacker Meet home"><span class="brand-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2l3.15 6.85L22 12l-6.85 3.15L12 22l-3.15-6.85L2 12l6.85-3.15L12 2Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.3" fill="currentColor"/></svg></span>backpacker<span style="color:#bd8350">meet</span></a>
-    <nav class="nav-links" aria-label="Main navigation"><a href="#features">The idea</a><a href="#how-it-works">How it works</a><a href="#project">Our progress</a><a class="button dark" href="mailto:founder@backpackermeet.app?subject=Backpacker%20Meet%20enquiry">Get in touch <span aria-hidden="true">↗</span></a></nav>
+    <nav class="nav-links" aria-label="Main navigation"><a href="#features">The idea</a><a href="#how-it-works">How it works</a><a href="#project">Our progress</a><a class="button dark" href="#waitlist">
+  Join the waitlist ↗
+</a></nav>
   </div></header>
   <main id="main">
     <section class="hero" id="top"><div class="wrap hero-grid">
@@ -118,8 +120,163 @@
       <div class="status"><strong><span class="dot" aria-hidden="true"></span>Current stage: Active development</strong><p>Features in the repository are not a promise that every part of the product is ready for public use.</p></div>
       <p style="margin-top:23px"><a class="small-link" target="_blank" rel="noopener noreferrer" href="https://github.com/jasonberylmini/backpackers-meet">Explore the source code ↗</a></p>
     </div></div></section>
-    <section class="callout"><div class="wrap"><div class="callout-inner"><div><p class="kicker" style="color:#73553b">Let's build a better way to go</p><h2>Good journeys start with a conversation.</h2><p>Interested in the project, want to share feedback, or thinking about collaborating? Reach out to the founder.</p></div><a class="button light" href="mailto:founder@backpackermeet.app?subject=Hello%20from%20Backpacker%20Meet">Contact the founder ↗</a></div></div></section>
+    <section class="callout" id="waitlist">
+  <div class="wrap">
+    <div class="callout-inner waitlist-inner">
+      <div class="waitlist-copy">
+        <p class="kicker" style="color:#73553b">Early access</p>
+        <h2>Help shape the first version of Backpacker Meet.</h2>
+        <p>
+          Join the early-access list and we'll keep you posted as the product
+          moves from active development toward real-world testing.
+        </p>
+      </div>
+
+      <form id="waitlist-form" class="waitlist-form" novalidate>
+        <div>
+          <label for="waitlist-name">Name</label>
+          <input
+            id="waitlist-name"
+            name="name"
+            type="text"
+            autocomplete="name"
+            maxlength="80"
+            placeholder="Your name"
+            required
+          >
+        </div>
+
+        <div>
+          <label for="waitlist-email">Email</label>
+          <input
+            id="waitlist-email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            maxlength="254"
+            placeholder="you@example.com"
+            required
+          >
+        </div>
+
+        <div>
+          <label for="waitlist-destination">Where are you headed?</label>
+          <input
+            id="waitlist-destination"
+            name="destination"
+            type="text"
+            maxlength="120"
+            placeholder="Optional · e.g. Vietnam, Europe, Himachal"
+          >
+        </div>
+
+        <input
+          class="hp"
+          name="website"
+          type="text"
+          tabindex="-1"
+          autocomplete="off"
+          aria-hidden="true"
+        >
+
+        <button id="waitlist-submit" class="button light" type="submit">
+          Join early access <span aria-hidden="true">↗</span>
+        </button>
+
+        <p class="waitlist-note">
+          We'll only use your email for Backpacker Meet updates.
+        </p>
+
+        <p
+          id="waitlist-status"
+          class="waitlist-status"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </form>
+    </div>
+  </div>
+</section>
   </main>
   <footer class="footer"><div class="wrap"><div class="footer-inner"><div><div class="foot-brand">backpackermeet.app</div><div class="foot-note">An independent, early-stage travel technology project.</div></div><div class="footer-links"><a href="#top">Back to top ↑</a><a href="https://github.com/jasonberylmini/backpackers-meet" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="mailto:founder@backpackermeet.app?subject=Backpacker%20Meet%20enquiry">Contact</a></div></div><p class="legal">© 2026 Backpacker Meet. Product concepts shown here describe an application in development. Not affiliated with GitHub, Cloudflare, or Anthropic.</p></div></footer>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+(() => {
+  const SUPABASE_URL = 'https://zebyaessythnoyedoyad.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY =
+    'sb_publishable_r4gsad1Z9q5nLZFuzeTkUg_EDE_AmUB';
+
+  const { createClient } = window.supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  const form = document.getElementById('waitlist-form');
+  const status = document.getElementById('waitlist-status');
+  const submit = document.getElementById('waitlist-submit');
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    status.textContent = '';
+    status.className = 'waitlist-status';
+
+    const data = new FormData(form);
+    const name = String(data.get('name') || '').trim();
+    const email = String(data.get('email') || '').trim().toLowerCase();
+    const destination = String(data.get('destination') || '').trim();
+    const honeypot = String(data.get('website') || '').trim();
+
+    if (honeypot) return;
+
+    if (name.length < 1) {
+      status.textContent = 'Please enter your name.';
+      status.classList.add('error');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      status.textContent = 'Please enter a valid email address.';
+      status.classList.add('error');
+      return;
+    }
+
+    submit.disabled = true;
+    submit.innerHTML = 'Joining…';
+
+    const { error } = await db
+      .from('waitlist_signups')
+      .insert({
+        name,
+        email,
+        destination: destination || null
+      });
+
+    if (!error) {
+      status.textContent = "You're on the list. We'll keep you posted.";
+      status.classList.add('success');
+      form.reset();
+      submit.innerHTML = 'Joined ✓';
+      return;
+    }
+
+    if (error.code === '23505') {
+      status.textContent = "You're already on the list.";
+      status.classList.add('success');
+      submit.disabled = false;
+      submit.innerHTML = 'Join early access ↗';
+      return;
+    }
+
+    console.error('Waitlist signup failed:', error);
+
+    status.textContent =
+      'Something went wrong. Please try again in a moment.';
+    status.classList.add('error');
+
+    submit.disabled = false;
+    submit.innerHTML = 'Join early access ↗';
+  });
+})();
+</script>
 </body>
 </html>
